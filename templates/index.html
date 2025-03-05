@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>随机图片服务</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        #settingsModal {
+            display: none;
+            position: fixed;
+            top: 20%; left: 30%;
+            background: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 500px;
+            border-radius: 8px;
+        }
+        .cron-examples {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .cron-examples ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+        .cron-examples li {
+            margin: 5px 0;
+            color: #666;
+        }
+        input#cronExp {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button#settingsBtn, button#refreshBtn {
+            position: fixed;
+            padding: 10px 20px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button#settingsBtn {
+            top: 10px;
+            right: 10px;
+        }
+        button#refreshBtn {
+            top: 10px;
+            right: 100px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        img {
+            max-width: 80%;
+            margin: 20px auto;
+            display: block;
+            border-radius: 8px;
+        }
+        #imageContainer {
+            position: relative;
+            width: 80%;
+            margin: 20px auto;
+            min-height: 200px;
+        }
+        #loadingIndicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+        }
+        .fade {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .fade-out {
+            opacity: 0;
+        }
+        .fade-in {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="settingsModal">
+        <h3>切换频率设置</h3>
+        <p>当前设置: <span id="currentCron">loading...</span></p>
+        <p>下次执行: <span id="nextRun">loading...</span></p>
+        <p>上次更新: <span id="lastUpdate">loading...</span></p>
+        <p>当前图片: <span id="currentImage">loading...</span></p>
+        <input type="text" id="cronExp" placeholder="输入cron表达式 如: */5 * * * * (每5分钟)">
+        <div class="cron-examples">
+            <p>常用示例:</p>
+            <ul>
+                <li>*/5 * * * * - 每5分钟</li>
+                <li>*/10 * * * * - 每10分钟</li>
+                <li>*/30 * * * * - 每30分钟</li>
+                <li>0 * * * * - 每小时整点</li>
+                <li>0 */2 * * * - 每2小时</li>
+            </ul>
+        </div>
+        <button onclick="saveSettings()">保存</button>
+        <button onclick="closeSettings()">关闭</button>
+    </div>
+    <button id="settingsBtn" onclick="showSettings()">设置</button>
+    <button id="refreshBtn" onclick="refreshImage()">切换图片</button>
+    <div id="imageContainer">
+        <img id="mainImage" src="/image" alt="随机图片" style="display: none;">
+        <div id="loadingIndicator" style="display: none;">加载中...</div>
+    </div>
+
+    <script>
+        let isLoading = false;
+        const mainImage = document.getElementById('mainImage');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        function showLoading() {
+            isLoading = true;
+            mainImage.style.opacity = '0.3';
+            loadingIndicator.style.display = 'block';
+        }
+
+        function hideLoading() {
+            isLoading = false;
+            mainImage.style.opacity = '1';
+            loadingIndicator.style.display = 'none';
+        }
+
+        function loadImage(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+
+        async function updateImage(url) {
+            if (isLoading) return;
+            
+            showLoading();
+            try {
+                await loadImage(url);
+                mainImage.src = url;
+                mainImage.style.display = 'block';
+            } catch (error) {
+                console.error('图片加载失败:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 手动切换图片
+        async function refreshImage() {
+            if (isLoading) return;
+            
+            try {
+                await fetch('/refresh', { method: 'POST' });
+                // 更新主图片
+                await updateImage(`/image?t=${Date.now()}`);
+                // 同时更新固定地址的图片
+                const fixedImages = document.querySelectorAll('img[src*="/img/today.jpg"]');
+                fixedImages.forEach(img => {
+                    img.src = `/img/today.jpg?t=${Date.now()}`;
+                });
+                updateScheduleInfo();
+            } catch (error) {
+                console.error('刷新失败:', error);
+                hideLoading();
+            }
+        }
+
+        // 更新调度信息
+        function updateScheduleInfo() {
+            fetch('/get-schedule')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('currentCron').textContent = data.cron;
+                    document.getElementById('nextRun').textContent = data.next_run;
+                    document.getElementById('lastUpdate').textContent = data.last_update;
+                    document.getElementById('currentImage').textContent = data.current_image || '无';
+                    document.getElementById('cronExp').value = data.cron;
+                })
+                .catch(error => {
+                    console.error('获取调度信息失败:', error);
+                });
+        }
+
+        // 定期更新图片
+        setInterval(async () => {
+            if (!isLoading) {
+                await updateImage(`/image?t=${Date.now()}`);
+                updateScheduleInfo();
+            }
+        }, 60000); // 每1分钟检查一次
+
+        // 初始化
+        window.onload = () => {
+            mainImage.style.display = 'block';
+            updateScheduleInfo();
+        };
+
+        // 显示设置弹窗
+        function showSettings() {
+            document.getElementById('settingsModal').style.display = 'block';
+            updateScheduleInfo();
+        }
+
+        // 关闭设置弹窗
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        // 保存设置
+        function saveSettings() {
+            const cronExp = document.getElementById('cronExp').value;
+            if (!cronExp) {
+                alert('请输入cron表达式');
+                return;
+            }
+            fetch('/save-schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cron: cronExp })
+            }).then(response => {
+                if (response.ok) {
+                    response.json().then(data => {
+                        alert(`设置已保存\n下次执行时间: ${data.next_run}`);
+                        updateScheduleInfo();
+                    });
+                } else {
+                    response.json().then(data => {
+                        alert('保存失败: ' + data.error);
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>
