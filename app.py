@@ -126,18 +126,21 @@ def translate_cron(exp: str) -> str:
 app = Flask(__name__, static_url_path='', static_folder='.')
 # 使用当前目录作为基础目录
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FOLDER = os.getenv('CONFIG_FOLDER', os.path.join(BASE_DIR, 'config'))
 IMAGE_FOLDER = os.getenv('IMAGE_FOLDER', os.path.join(BASE_DIR, 'images'))
-CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
+CONFIG_FILE = os.path.join(CONFIG_FOLDER, 'config.json')
 
 # 初始化随机种子
 random.seed(int(datetime.now().timestamp()))
 
 print(f"应用程序配置信息:")
 print(f"BASE_DIR: {BASE_DIR}")
+print(f"CONFIG_FOLDER: {CONFIG_FOLDER}")
 print(f"IMAGE_FOLDER: {IMAGE_FOLDER}")
 print(f"CONFIG_FILE: {CONFIG_FILE}")
 
 # 确保必要的目录存在
+os.makedirs(CONFIG_FOLDER, exist_ok=True)
 os.makedirs(IMAGE_FOLDER, exist_ok=True)
 
 CURRENT_IMAGE = {"path": None}

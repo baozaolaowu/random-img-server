@@ -35,27 +35,43 @@
 
 ## 快速开始
 
-1. 拉取 Docker 镜像：
+1. 创建配置目录：
+```bash
+# 创建配置和图片目录
+mkdir -p /path/to/config /path/to/images
+```
+
+2. 拉取 Docker 镜像：
 ```bash
 docker pull baozaolaowu/random-img-server:latest
 ```
 
-2. 运行容器：
+3. 运行容器：
 ```bash
 docker run -d \
   -p 5000:5000 \
-  -v "/path/to/your/images:/app/images" \
+  -v "/path/to/config:/app/config" \
+  -v "/path/to/images:/app/images" \
   --name random-img-server \
   baozaolaowu/random-img-server:latest
 ```
 
-3. 访问服务：
+4. 访问服务：
 - 网页界面：`http://localhost:5000`
 - 直接图片链接：`http://localhost:5000/img/today.jpg`
 
 ## 配置说明
 
+### 目录结构
+```
+/path/to/config/         # 配置文件目录
+  └── config.json       # 定时任务配置文件
+/path/to/images/         # 图片文件目录
+  └── *.jpg,*.png,...  # 图片文件
+```
+
 ### 环境变量
+- `CONFIG_FOLDER`：配置文件目录路径（默认：./config）
 - `IMAGE_FOLDER`：图片文件夹路径（默认：./images）
 
 ### 图片要求
@@ -116,27 +132,43 @@ A Flask-based web service that provides random images and daily pictures from yo
 
 ## Quick Start
 
-1. Pull the Docker image:
+1. Create configuration directory:
+```bash
+# Create config and images directories
+mkdir -p /path/to/config /path/to/images
+```
+
+2. Pull the Docker image:
 ```bash
 docker pull baozaolaowu/random-img-server:latest
 ```
 
-2. Run the container:
+3. Run the container:
 ```bash
 docker run -d \
   -p 5000:5000 \
-  -v "/path/to/your/images:/app/images" \
+  -v "/path/to/config:/app/config" \
+  -v "/path/to/images:/app/images" \
   --name random-img-server \
   baozaolaowu/random-img-server:latest
 ```
 
-3. Access the service:
+4. Access the service:
 - Web interface: `http://localhost:5000`
 - Direct image URL: `http://localhost:5000/img/today.jpg`
 
 ## Configuration
 
+### Directory Structure
+```
+/path/to/config/         # Configuration directory
+  └── config.json       # Cron job configuration file
+/path/to/images/         # Images directory
+  └── *.jpg,*.png,...  # Image files
+```
+
 ### Environment Variables
+- `CONFIG_FOLDER`: Path to config folder (default: ./config)
 - `IMAGE_FOLDER`: Path to images folder (default: ./images)
 
 ### Image Requirements

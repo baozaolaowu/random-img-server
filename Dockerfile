@@ -10,7 +10,7 @@ RUN pip install -r requirements.txt
 COPY . .
 
 # 创建必要的目录
-RUN mkdir -p images templates
+RUN mkdir -p config images templates
 
 # 暴露端口
 EXPOSE 5000
