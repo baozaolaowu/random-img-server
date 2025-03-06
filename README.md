@@ -1,8 +1,13 @@
 <img src="assets/image/logo.png" alt="随机图片&每日一图" width="200">
 
+
+
 # 随机图片&每日一图
 
 一个基于 Flask 的网页服务，提供随机图片和每日一图功能，支持本地文件夹（如 NAS）中的图片自动刷新显示。
+
+## docker地址
+`https://hub.docker.com/repository/docker/baozaolaowu/random-img-server/general`
 
 ## 功能特点
 
