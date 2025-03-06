@@ -69,6 +69,16 @@ docker run -d \
 - `0 */2 * * *` → 每2小时
 - `0 9 * * 1-5` → 工作日上午9点
 
+## 赞赏支持 Donate
+
+如果您觉得这个项目对您有帮助，欢迎赞赏支持 👏
+
+<div align="center">
+  <img src="assets/image/donate/wx.jpg" alt="微信收款码" width="200" style="margin-right: 20px">
+  <img src="assets/image/donate/zfb.jpg" alt="支付宝收款码" width="200">
+</div>
+
+
 ---
 
 # Random Image & Daily Picture
@@ -140,4 +150,3 @@ docker run -d \
 - `0 */2 * * *` → Every 2 hours
 - `0 9 * * 1-5` → Weekdays at 9:00 AM
 
-## API Endpoints API接口
