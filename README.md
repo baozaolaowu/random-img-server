@@ -70,10 +70,6 @@ docker run -d \
   └── *.jpg,*.png,...  # 图片文件
 ```
 
-### 环境变量
-- `CONFIG_FOLDER`：配置文件目录路径（默认：./config）
-- `IMAGE_FOLDER`：图片文件夹路径（默认：./images）
-
 ### 图片要求
 - 支持的格式：PNG、JPG、JPEG、GIF、BMP
 - 最大文件大小：50MB
@@ -166,10 +162,6 @@ docker run -d \
 /path/to/images/         # Images directory
   └── *.jpg,*.png,...  # Image files
 ```
-
-### Environment Variables
-- `CONFIG_FOLDER`: Path to config folder (default: ./config)
-- `IMAGE_FOLDER`: Path to images folder (default: ./images)
 
 ### Image Requirements
 - Supported formats: PNG, JPG, JPEG, GIF, BMP
