@@ -1,0 +1,6 @@
+# 强制指定 XML 文件使用 LF 换行符
+*.xml text eol=lf
+
+# 其他文件可根据需要添加规则
+*.sh text eol=lf
+*.txt text
