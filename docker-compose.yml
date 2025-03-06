@@ -1,9 +1,0 @@
-version: '3'
-services:
-  random-img:
-    build: .
-    ports:
-      - "5000:5000"
-    volumes:
-      - "C:/Users/wangs/Downloads/img:/app/images:ro"
-    restart: unless-stopped
