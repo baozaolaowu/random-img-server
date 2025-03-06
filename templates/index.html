@@ -1,41 +1,146 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>随机图片服务</title>
+    <title>随机图片&每日一图</title>
+    <link rel="icon" type="image/png" href="/assets/image/logo.png">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
         #settingsModal {
             display: none;
             position: fixed;
-            top: 20%; left: 30%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             background: white;
-            padding: 20px;
-            border: 1px solid #ccc;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             z-index: 1000;
-            max-width: 500px;
+            width: 800px;
+            max-width: 90vw;
+        }
+        .modal-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+        .modal-section {
+            background: #f8f9fa;
+            padding: 20px;
             border-radius: 8px;
         }
-        .cron-examples {
-            margin-top: 15px;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 4px;
+        .modal-section h3 {
+            margin: 0 0 15px 0;
+            color: #2196F3;
+            font-size: 18px;
         }
-        .cron-examples ul {
-            margin: 5px 0;
-            padding-left: 20px;
-        }
-        .cron-examples li {
-            margin: 5px 0;
+        .modal-section p {
+            margin: 8px 0;
             color: #666;
+        }
+        .modal-section span {
+            color: #333;
+            font-weight: 500;
+        }
+        .display-settings {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+        .display-settings label {
+            display: block;
+            margin: 12px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .display-settings label:hover {
+            background: #e3f2fd;
+        }
+        .display-settings input[type="radio"] {
+            margin-right: 10px;
+        }
+        .cron-examples {
+            margin: 15px 0 0 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .cron-examples p {
+            margin: 0 0 10px 0;
+            color: #2196F3;
+            font-weight: 500;
+        }
+        .cron-examples .example-item {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 10px;
+            margin: 8px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        .cron-examples .example-item:hover {
+            background: #e3f2fd;
+            cursor: pointer;
+        }
+        .cron-examples .cron-exp {
+            font-family: monospace;
+            color: #666;
+        }
+        .cron-examples .cron-desc {
+            color: #333;
         }
         input#cronExp {
             width: 100%;
-            padding: 8px;
+            padding: 12px;
             margin: 10px 0;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        input#cronExp:focus {
+            border-color: #2196F3;
+            outline: none;
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .modal-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+        .modal-buttons button:first-child {
+            background: #2196F3;
+            color: white;
+        }
+        .modal-buttons button:last-child {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .modal-buttons button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
         }
         button#settingsBtn, button#refreshBtn {
             position: fixed;
@@ -45,29 +150,39 @@
             border: none;
             cursor: pointer;
             border-radius: 4px;
+            z-index: 100;
+            top: 20px;
         }
         button#settingsBtn {
-            top: 10px;
-            right: 10px;
+            right: 20px;
         }
         button#refreshBtn {
-            top: 10px;
-            right: 100px;
+            right: 120px;
         }
         button:hover {
             background: #1976D2;
         }
-        img {
-            max-width: 80%;
-            margin: 20px auto;
-            display: block;
-            border-radius: 8px;
-        }
         #imageContainer {
-            position: relative;
-            width: 80%;
-            margin: 20px auto;
-            min-height: 200px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: #000;
+        }
+        img {
+            max-width: 100%;
+            max-height: 100%;
+            margin: 0;
+            display: block;
+            transition: all 0.3s ease;
         }
         #loadingIndicator {
             position: absolute;
@@ -88,28 +203,91 @@
         .fade-in {
             opacity: 1;
         }
+        
+        /* 图片显示模式样式 */
+        .img-width-fill {
+            width: 100vw !important;
+            height: auto !important;
+            max-height: 100vh !important;
+            object-fit: cover !important;
+        }
+        .img-height-fill {
+            width: auto !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            object-fit: cover !important;
+        }
+        .img-stretch-fill {
+            width: 100vw !important;
+            height: 100vh !important;
+            object-fit: fill !important;
+        }
+        .img-smart-fill {
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            object-fit: cover !important;
+        }
     </style>
 </head>
 <body>
     <div id="settingsModal">
-        <h3>切换频率设置</h3>
-        <p>当前设置: <span id="currentCron">loading...</span></p>
-        <p>下次执行: <span id="nextRun">loading...</span></p>
-        <p>上次更新: <span id="lastUpdate">loading...</span></p>
-        <p>当前图片: <span id="currentImage">loading...</span></p>
-        <input type="text" id="cronExp" placeholder="输入cron表达式 如: */5 * * * * (每5分钟)">
-        <div class="cron-examples">
-            <p>常用示例:</p>
-            <ul>
-                <li>*/5 * * * * - 每5分钟</li>
-                <li>*/10 * * * * - 每10分钟</li>
-                <li>*/30 * * * * - 每30分钟</li>
-                <li>0 * * * * - 每小时整点</li>
-                <li>0 */2 * * * - 每2小时</li>
-            </ul>
+        <div class="modal-grid">
+            <div class="modal-section">
+                <h3>定时设置</h3>
+                <p>当前设置: <span id="currentCron">loading...</span></p>
+                <p>描述: <span id="cronDesc" style="color: #2196F3;">loading...</span></p>
+                <p>下次执行: <span id="nextRun">loading...</span></p>
+                <p>上次更新: <span id="lastUpdate">loading...</span></p>
+                <p>当前图片: <span id="currentImage">loading...</span></p>
+                <input type="text" id="cronExp" placeholder="输入cron表达式 如: */5 * * * * (每5分钟)">
+                <div class="cron-examples">
+                    <p>常用示例（点击使用）:</p>
+                    <div class="example-item" onclick="applyCron('*/5 * * * *')">
+                        <span class="cron-exp">*/5 * * * *</span>
+                        <span class="cron-desc">每5分钟</span>
+                    </div>
+                    <div class="example-item" onclick="applyCron('*/10 * * * *')">
+                        <span class="cron-exp">*/10 * * * *</span>
+                        <span class="cron-desc">每10分钟</span>
+                    </div>
+                    <div class="example-item" onclick="applyCron('*/30 * * * *')">
+                        <span class="cron-exp">*/30 * * * *</span>
+                        <span class="cron-desc">每30分钟</span>
+                    </div>
+                    <div class="example-item" onclick="applyCron('0 * * * *')">
+                        <span class="cron-exp">0 * * * *</span>
+                        <span class="cron-desc">每小时整点</span>
+                    </div>
+                    <div class="example-item" onclick="applyCron('0 */2 * * *')">
+                        <span class="cron-exp">0 */2 * * *</span>
+                        <span class="cron-desc">每2小时</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-section">
+                <h3>显示设置</h3>
+                <div class="display-settings">
+                    <label>
+                        <input type="radio" name="displayMode" value="smart" checked> 智能模式
+                    </label>
+                    <label>
+                        <input type="radio" name="displayMode" value="width"> 宽度撑满
+                    </label>
+                    <label>
+                        <input type="radio" name="displayMode" value="height"> 高度撑满
+                    </label>
+                    <label>
+                        <input type="radio" name="displayMode" value="stretch"> 宽高拉伸撑满
+                    </label>
+                </div>
+            </div>
         </div>
-        <button onclick="saveSettings()">保存</button>
-        <button onclick="closeSettings()">关闭</button>
+        
+        <div class="modal-buttons">
+            <button onclick="saveSettings()">保存设置</button>
+            <button onclick="closeSettings()">关闭</button>
+        </div>
     </div>
     <button id="settingsBtn" onclick="showSettings()">设置</button>
     <button id="refreshBtn" onclick="refreshImage()">切换图片</button>
@@ -149,9 +327,13 @@
             
             showLoading();
             try {
-                await loadImage(url);
+                const img = await loadImage(url);
                 mainImage.src = url;
                 mainImage.style.display = 'block';
+                
+                // 重新应用当前显示模式
+                const currentMode = localStorage.getItem('displayMode') || 'smart';
+                applyDisplayMode(currentMode, mainImage);
             } catch (error) {
                 console.error('图片加载失败:', error);
             } finally {
@@ -185,6 +367,7 @@
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('currentCron').textContent = data.cron;
+                    document.getElementById('cronDesc').textContent = data.cron_readable;
                     document.getElementById('nextRun').textContent = data.next_run;
                     document.getElementById('lastUpdate').textContent = data.last_update;
                     document.getElementById('currentImage').textContent = data.current_image || '无';
@@ -192,21 +375,160 @@
                 })
                 .catch(error => {
                     console.error('获取调度信息失败:', error);
+                })
+                .finally(() => {
+                    // 如果页面可见，继续下一次更新
+                    if (!document.hidden) {
+                        scheduleNextUpdate();
+                    }
                 });
         }
 
-        // 定期更新图片
-        setInterval(async () => {
-            if (!isLoading) {
-                await updateImage(`/image?t=${Date.now()}`);
-                updateScheduleInfo();
+        // 应用cron示例
+        function applyCron(exp) {
+            document.getElementById('cronExp').value = exp;
+        }
+
+        // 定时更新逻辑
+        let updateTimer = null;
+        const UPDATE_INTERVAL = 60000; // 1分钟
+
+        function scheduleNextUpdate() {
+            if (updateTimer) {
+                clearTimeout(updateTimer);
             }
-        }, 60000); // 每1分钟检查一次
+            updateTimer = setTimeout(() => {
+                if (!isLoading && !document.hidden) {
+                    updateScheduleInfo();
+                }
+            }, UPDATE_INTERVAL);
+        }
+
+        // 监听页面可见性变化
+        document.addEventListener('visibilitychange', () => {
+            const visibilityState = document.visibilityState; // 'visible' 或 'hidden'
+            const isHidden = document.hidden;
+            
+            console.log('页面状态变化:');
+            console.log('- 可见性状态:', visibilityState);
+            console.log('- 是否隐藏:', isHidden);
+            console.log('- 当前标签页是否活跃:', !isHidden);
+            
+            if (isHidden) {
+                // 页面不可见时（切换标签页/最小化/锁屏等）
+                console.log('页面不可见，暂停更新');
+                if (updateTimer) {
+                    clearTimeout(updateTimer);
+                    updateTimer = null;
+                }
+            } else {
+                // 页面重新可见时（切回标签页/恢复窗口等）
+                console.log('页面重新可见，恢复更新');
+                // 立即更新一次信息
+                updateScheduleInfo();
+                // 更新图片（如果设置了自动更新）
+                if (document.getElementById('cronExp').value.includes('*')) {
+                    updateImage(`/image?t=${Date.now()}`);
+                }
+            }
+        });
+
+        // 初始化显示模式
+        function initDisplayMode() {
+            const savedMode = localStorage.getItem('displayMode') || 'smart';
+            document.querySelector(`input[value="${savedMode}"]`).checked = true;
+            applyDisplayMode(savedMode);
+        }
+
+        // 应用显示模式
+        function applyDisplayMode(mode, imageElement = null) {
+            const img = imageElement || document.getElementById('mainImage');
+            console.log(`应用显示模式: ${mode}`);
+            
+            // 移除所有模式类
+            img.classList.remove('img-width-fill', 'img-height-fill', 'img-stretch-fill', 'img-smart-fill');
+            
+            if (mode === 'smart') {
+                img.classList.add('img-smart-fill');
+                // 检查图片方向并应用相应样式
+                if (img.naturalWidth && img.naturalHeight) {
+                    console.log('图片已加载，直接应用智能模式');
+                    applySmartMode(img);
+                } else {
+                    console.log('图片未加载完成，等待加载后应用智能模式');
+                    img.onload = () => {
+                        console.log('图片加载完成，开始应用智能模式');
+                        applySmartMode(img);
+                    };
+                }
+            } else {
+                console.log(`应用固定模式: ${mode}`);
+                img.classList.add(`img-${mode}-fill`);
+            }
+            
+            // 保存到本地存储
+            localStorage.setItem('displayMode', mode);
+        }
+
+        // 智能模式逻辑
+        function applySmartMode(img) {
+            const imageRatio = img.naturalWidth / img.naturalHeight;
+            const screenRatio = window.innerWidth / window.innerHeight;
+            
+            console.log('智能模式判断信息:');
+            console.log(`图片尺寸: ${img.naturalWidth} x ${img.naturalHeight}`);
+            console.log(`图片宽高比: ${imageRatio.toFixed(2)}`);
+            console.log(`屏幕尺寸: ${window.innerWidth} x ${window.innerHeight}`);
+            console.log(`屏幕宽高比: ${screenRatio.toFixed(2)}`);
+            
+            // 移除之前的样式
+            img.style.width = '';
+            img.style.height = '';
+            img.style.maxWidth = '';
+            img.style.maxHeight = '';
+            
+            if (imageRatio > screenRatio) {
+                console.log('判定为横图，使用高度适配');
+                // 横图，使用高度适配，宽度自适应
+                img.style.height = '100vh';
+                img.style.width = 'auto';
+                img.style.maxWidth = '100vw';
+                img.style.objectFit = 'cover';
+            } else {
+                console.log('判定为竖图，使用宽度适配');
+                // 竖图，使用宽度适配，高度自适应
+                img.style.width = '100vw';
+                img.style.height = 'auto';
+                img.style.maxHeight = '100vh';
+                img.style.objectFit = 'cover';
+            }
+            console.log('应用后的样式:', img.style.cssText);
+        }
+
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            const currentMode = localStorage.getItem('displayMode') || 'smart';
+            if (currentMode === 'smart') {
+                applyDisplayMode('smart');
+            }
+        });
+
+        // 监听显示模式变化
+        document.querySelectorAll('input[name="displayMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    applyDisplayMode(e.target.value);
+                }
+            });
+        });
 
         // 初始化
         window.onload = () => {
             mainImage.style.display = 'block';
             updateScheduleInfo();
+            initDisplayMode();
+            // 启动时加载一次图片
+            updateImage(`/image?t=${Date.now()}`);
         };
 
         // 显示设置弹窗

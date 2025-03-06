@@ -6,12 +6,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+# 复制应用程序文件
+COPY . .
+
 # 创建必要的目录
 RUN mkdir -p images templates
-
-# 复制应用程序文件
-COPY app.py .
-COPY templates/index.html templates/
 
 # 暴露端口
 EXPOSE 5000

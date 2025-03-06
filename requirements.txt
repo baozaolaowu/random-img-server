@@ -1,2 +1,4 @@
-flask>=2.0.0
-apscheduler>=3.10.0
+flask==2.0.1
+werkzeug==2.0.3
+APScheduler==3.9.1
+watchdog==3.0.0

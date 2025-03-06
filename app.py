@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 import hashlib
 from werkzeug.http import http_date
 import mimetypes
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 def parse_cron(exp: str) -> dict:
     """解析cron表达式为字典参数"""
@@ -20,11 +22,115 @@ def parse_cron(exp: str) -> dict:
         'day_of_week': fields[4]
     }
 
-app = Flask(__name__)
+def translate_cron(exp: str) -> str:
+    """将cron表达式翻译成人类可读的文本"""
+    try:
+        fields = exp.strip().split()
+        if len(fields) != 5:
+            return "无效的cron表达式"
+            
+        minute, hour, day, month, week = fields
+        
+        # 处理分钟
+        minute_desc = ""
+        if minute == "*":
+            minute_desc = "每分钟"
+        elif minute.startswith('*/'):
+            minutes = minute[2:]
+            minute_desc = f"每{minutes}分钟"
+        elif minute.isdigit():
+            minute_desc = f"第{minute}分钟"
+            
+        # 处理小时
+        hour_desc = ""
+        if hour == "*":
+            if minute == "0":
+                hour_desc = "每小时整点"
+            else:
+                hour_desc = "每小时"
+        elif hour.startswith('*/'):
+            hours = hour[2:]
+            if minute == "0":
+                hour_desc = f"每{hours}小时整点"
+            else:
+                hour_desc = f"每{hours}小时的第{minute}分钟"
+        elif hour.isdigit():
+            hour_int = int(hour)
+            if hour_int < 12:
+                hour_desc = f"上午{hour_int}点"
+            elif hour_int == 12:
+                hour_desc = "中午12点"
+            else:
+                hour_desc = f"下午{hour_int-12}点"
+                
+        # 处理星期
+        week_desc = ""
+        if week != "*":
+            week_map = {
+                "0": "周日",
+                "6": "周六",
+                "1": "周一",
+                "2": "周二",
+                "3": "周三",
+                "4": "周四",
+                "5": "周五",
+                "1-5": "工作日"
+            }
+            if week in week_map:
+                week_desc = f"在{week_map[week]}"
+            elif week.startswith('*/'):
+                weeks = week[2:]
+                week_desc = f"每{weeks}天"
+                
+        # 处理月份
+        month_desc = ""
+        if month != "*":
+            if month.isdigit():
+                month_desc = f"{month}月"
+            elif month.startswith('*/'):
+                months = month[2:]
+                month_desc = f"每{months}个月"
+                
+        # 处理日期
+        day_desc = ""
+        if day != "*":
+            if day.isdigit():
+                day_desc = f"{day}日"
+            elif day.startswith('*/'):
+                days = day[2:]
+                day_desc = f"每{days}天"
+                
+        # 组合描述
+        if minute == "0" and hour != "*":
+            # 对于整点的特殊处理
+            if hour.isdigit():
+                desc = f"{week_desc} {month_desc} {day_desc} {hour_desc}".strip()
+            else:
+                desc = f"{week_desc} {month_desc} {day_desc} {hour_desc}".strip()
+        else:
+            if minute == "*" and hour == "*":
+                desc = "每分钟"
+            elif minute.startswith('*/') and hour == '*':
+                desc = minute_desc
+            else:
+                desc = f"{week_desc} {month_desc} {day_desc} {hour_desc} {minute_desc}".strip()
+                
+        # 移除多余的空格
+        desc = " ".join(filter(None, desc.split()))
+        return desc if desc else exp
+            
+    except Exception as e:
+        print(f"解析cron表达式出错: {str(e)}")
+        return exp
+
+app = Flask(__name__, static_url_path='', static_folder='.')
 # 使用当前目录作为基础目录
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGE_FOLDER = os.getenv('IMAGE_FOLDER', os.path.join(BASE_DIR, 'images'))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
+
+# 初始化随机种子
+random.seed(int(datetime.now().timestamp()))
 
 print(f"应用程序配置信息:")
 print(f"BASE_DIR: {BASE_DIR}")
@@ -232,6 +338,7 @@ def get_schedule():
         
         return jsonify({
             "cron": cron_exp,
+            "cron_readable": translate_cron(cron_exp),
             "next_run": next_run,
             "current_image": current_image,
             "last_update": update_time_str
@@ -240,6 +347,7 @@ def get_schedule():
         print(f"获取调度信息失败: {str(e)}")
         return jsonify({
             "cron": cron_exp,
+            "cron_readable": translate_cron(cron_exp),
             "next_run": "unknown",
             "current_image": None,
             "last_update": "unknown",
@@ -343,7 +451,52 @@ def get_today_image(format=None):
         print(error_msg)
         return jsonify({"error": error_msg}), 500
 
+class ImageFolderHandler(FileSystemEventHandler):
+    def __init__(self, refresh_callback):
+        self.refresh_callback = refresh_callback
+        self.last_refresh_time = 0
+        self.refresh_cooldown = 5  # 冷却时间（秒）
+
+    def on_created(self, event):
+        self._handle_event(event)
+
+    def on_modified(self, event):
+        self._handle_event(event)
+
+    def on_moved(self, event):
+        self._handle_event(event)
+
+    def _handle_event(self, event):
+        if event.is_directory:
+            return
+            
+        # 检查文件扩展名
+        if not event.src_path.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+            return
+            
+        # 检查冷却时间
+        current_time = datetime.now().timestamp()
+        if current_time - self.last_refresh_time < self.refresh_cooldown:
+            return
+            
+        print(f"检测到图片变化: {event.src_path}")
+        self.last_refresh_time = current_time
+        self.refresh_callback()
+
 if __name__ == '__main__':
     print("启动应用程序...")
+    
+    # 设置文件监控
+    event_handler = ImageFolderHandler(scheduled_refresh)
+    observer = Observer()
+    observer.schedule(event_handler, IMAGE_FOLDER, recursive=False)
+    observer.start()
+    print(f"已启动文件监控: {IMAGE_FOLDER}")
+    
     scheduled_refresh()  # 启动时立即加载
+    
+    # 设置环境变量禁用警告
+    os.environ['WERKZEUG_RUN_MAIN'] = 'true'
+    
+    # 启动应用
     app.run(host='0.0.0.0', port=5000)
