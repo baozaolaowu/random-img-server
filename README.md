@@ -4,6 +4,13 @@
 
 # 随机图片&每日一图
 
+## Demo地址：
+
+https://today-img.20160825.xyz
+
+https://today-img.20160825.xyz/img/today.jpg
+
+
 一个基于 Flask 的网页服务，提供随机图片和每日一图功能，支持本地文件夹（如 NAS）中的图片自动刷新显示。
 
 ## docker地址
