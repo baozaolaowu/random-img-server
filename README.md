@@ -109,6 +109,13 @@ docker run -d \
 
 A Flask-based web service that provides random images and daily pictures from your local folder (e.g., NAS) with automatic refresh functionality.
 
+## Demo：
+
+https://today-img.20160825.xyz
+
+https://today-img.20160825.xyz/img/today.jpg
+
+
 ## Features
 
 - 🖼️ Two ways to access images:
