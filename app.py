@@ -11,6 +11,24 @@ import mimetypes
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# 在文件顶部添加缓存变量
+CACHED_IMAGES = []
+LAST_SCAN_TIME = None
+CACHE_DURATION = 300  # 缓存有效期（秒）
+LAST_REFRESH_TIME = None
+REFRESH_COOLDOWN = 0.1  # 刷新冷却时间（秒）
+
+# 在文件顶部添加新的全局变量
+SCAN_STATUS = {
+    "is_scanning": False,
+    "total_files": 0,
+    "processed_files": 0,
+    "valid_images": 0,
+    "skipped_files": 0,
+    "current_file": "",
+    "start_time": None
+}
+
 def parse_cron(exp: str) -> dict:
     """解析cron表达式为字典参数"""
     fields = exp.strip().split()
@@ -177,97 +195,151 @@ def get_file_info(filepath):
         'etag': f'"{get_file_hash(filepath)}"'
     }
 
-# 定时任务逻辑
+def get_all_images(directory):
+    """递归获取目录下所有图片文件"""
+    global SCAN_STATUS
+    SCAN_STATUS["is_scanning"] = True
+    SCAN_STATUS["start_time"] = datetime.now()
+    SCAN_STATUS["total_files"] = 0
+    SCAN_STATUS["processed_files"] = 0
+    SCAN_STATUS["valid_images"] = 0
+    SCAN_STATUS["skipped_files"] = 0
+    
+    start_time = SCAN_STATUS["start_time"]
+    images = []
+    print(f"\n[{start_time}] 开始扫描图片目录: {directory}")
+    
+    # 先统计总文件数
+    for root, _, files in os.walk(directory):
+        SCAN_STATUS["total_files"] += len(files)
+    
+    # 然后处理文件
+    for root, _, files in os.walk(directory):
+        for f in files:
+            SCAN_STATUS["processed_files"] += 1
+            SCAN_STATUS["current_file"] = f
+            
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                file_path = os.path.join(root, f)
+                try:
+                    file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+                    if file_size <= 50:  # 限制50MB
+                        images.append(file_path)
+                        SCAN_STATUS["valid_images"] += 1
+                        print(f"添加文件: {f} ({file_size:.1f}MB)")
+                    else:
+                        SCAN_STATUS["skipped_files"] += 1
+                        print(f"跳过大文件: {f} ({file_size:.1f}MB)")
+                except Exception as e:
+                    print(f"读取文件出错 {f}: {str(e)}")
+                    SCAN_STATUS["skipped_files"] += 1
+    
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+    print(f"\n扫描完成统计:")
+    print(f"- 总文件数: {SCAN_STATUS['total_files']}")
+    print(f"- 有效图片: {SCAN_STATUS['valid_images']}")
+    print(f"- 跳过文件: {SCAN_STATUS['skipped_files']}")
+    print(f"- 扫描用时: {duration:.2f}秒")
+    
+    SCAN_STATUS["is_scanning"] = False
+    return images
+
 def scheduled_refresh():
+    """定时刷新图片"""
+    global CACHED_IMAGES, LAST_SCAN_TIME
+    
     with lock:
         try:
             start_time = datetime.now()
-            print(f"[{start_time}] 开始刷新图片...")
+            print(f"\n[{start_time}] 开始刷新图片...")
 
-            # 检查目录是否存在
-            if not os.path.exists(IMAGE_FOLDER):
-                print(f"图片目录不存在: {IMAGE_FOLDER}")
+            # 如果没有缓存，返回错误
+            if not CACHED_IMAGES:
+                print("没有缓存的图片列表，请先扫描目录")
                 return
-
-            # 获取图片列表（添加文件大小限制）
-            print(f"扫描目录: {IMAGE_FOLDER}")
-            all_files = os.listdir(IMAGE_FOLDER)
-            print(f"目录中的所有文件: {all_files}")
+                
+            print(f"使用缓存中的图片列表 (共 {len(CACHED_IMAGES)} 个)")
             
-            images = []
-            for f in all_files:
-                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
-                    file_path = os.path.join(IMAGE_FOLDER, f)
-                    try:
-                        file_size = os.path.getsize(file_path) / (1024 * 1024)  # 转换为MB
-                        print(f"检查文件: {f} (大小: {file_size:.1f}MB)")
-                        if file_size <= 50:  # 限制文件大小不超过50MB
-                            images.append(f)
-                            print(f"添加文件到列表: {f}")
-                        else:
-                            print(f"跳过大文件 {f} ({file_size:.1f}MB)")
-                    except Exception as e:
-                        print(f"读取文件 {f} 时出错: {str(e)}")
+            # 选择新图片
+            old_image = CURRENT_IMAGE.get('path')
+            max_attempts = 5
+            attempts = 0
             
-            # 检查是否有图片
-            if not images:
-                print(f"没有找到合适的图片文件")
-                print(f"支持的格式: .png, .jpg, .jpeg, .gif, .bmp")
-                return
+            while attempts < max_attempts:
+                selected_image = random.choice(CACHED_IMAGES)
+                if selected_image != old_image or len(CACHED_IMAGES) == 1:
+                    break
+                attempts += 1
+                print(f"尝试选择不同的图片 (尝试 {attempts}/{max_attempts})")
             
-            print(f"可用图片列表: {images}")
-            
-            # 选择并设置图片
-            selected_image = random.choice(images)
-            image_path = os.path.join(IMAGE_FOLDER, selected_image)
             print(f"选中图片: {selected_image}")
             
-            # 验证文件是否可访问
-            if not os.path.isfile(image_path):
-                print(f"选中的图片文件不存在: {image_path}")
+            # 验证文件
+            if not os.path.isfile(selected_image):
+                print(f"文件不存在，从缓存中移除: {selected_image}")
+                CACHED_IMAGES.remove(selected_image)
                 return
                 
             try:
-                # 测试文件是否可读
-                with open(image_path, 'rb') as f:
+                # 测试文件可读性
+                with open(selected_image, 'rb') as f:
                     f.read(1)
-                print(f"文件可以正常读取: {image_path}")
+                print("文件可以正常读取")
             except Exception as e:
-                print(f"文件无法读取: {image_path}")
-                print(f"错误信息: {str(e)}")
+                print(f"文件无法读取: {str(e)}")
+                CACHED_IMAGES.remove(selected_image)
                 return
                 
-            CURRENT_IMAGE['path'] = image_path
+            CURRENT_IMAGE['path'] = selected_image
             CURRENT_IMAGE['update_time'] = start_time
-            CURRENT_IMAGE['info'] = get_file_info(image_path)
+            CURRENT_IMAGE['info'] = get_file_info(selected_image)
             
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            file_size = os.path.getsize(image_path) / (1024 * 1024)  # MB
-            print(f"[{end_time}] 图片已切换至: {CURRENT_IMAGE['path']} ({file_size:.1f}MB)")
-            print(f"刷新耗时: {duration:.2f}秒")
+            file_size = os.path.getsize(selected_image) / (1024 * 1024)
+            print(f"\n刷新完成:")
+            print(f"- 新图片: {os.path.basename(selected_image)}")
+            print(f"- 文件大小: {file_size:.1f}MB")
+            print(f"- 总用时: {duration:.2f}秒")
             
         except Exception as e:
-            print(f"更新图片时发生错误: {str(e)}")
+            print(f"刷新图片时发生错误: {str(e)}")
             import traceback
             print(traceback.format_exc())
 
 # 初始化调度器
 scheduler = BackgroundScheduler(daemon=True, timezone='Asia/Shanghai')
-scheduler.start()  # 先启动调度器
+scheduler.start()
 
-# 解析当前的cron表达式
+# 添加定时扫描任务（每30分钟扫描一次）
+try:
+    scan_job = scheduler.add_job(
+        get_all_images, 
+        'interval', 
+        minutes=30,
+        id='scan_task',
+        args=[IMAGE_FOLDER],
+        next_run_time=None  # 不立即执行，因为启动时已经执行过了
+    )
+    print("已设置目录扫描任务: 每30分钟")
+    if scan_job and scan_job.next_run_time:
+        print(f"下次扫描时间: {scan_job.next_run_time}")
+except Exception as e:
+    print(f"设置扫描任务失败: {str(e)}")
+
+# 解析当前的cron表达式（原有的刷新任务）
 try:
     cron_dict = parse_cron(cron_exp)
     job = scheduler.add_job(scheduled_refresh, 'cron', id='refresh_task', **cron_dict)
-    print(f"已设置定时任务: {cron_exp}")
+    print(f"已设置定时刷新任务: {cron_exp}")
     if job and job.next_run_time:
-        print(f"下次执行时间: {job.next_run_time}")
+        print(f"下次刷新时间: {job.next_run_time}")
 except Exception as e:
-    print(f"设置定时任务失败，使用默认值: {str(e)}")
-    job = scheduler.add_job(scheduled_refresh, 'cron', id='refresh_task', minute='*/1')  # 默认每1分钟执行一次
+    print(f"设置定时刷新任务失败，使用默认值: {str(e)}")
+    job = scheduler.add_job(scheduled_refresh, 'cron', id='refresh_task', minute='*/1')
     if job and job.next_run_time:
-        print(f"已设置默认定时任务，下次执行时间: {job.next_run_time}")
+        print(f"已设置默认定时刷新任务，下次执行时间: {job.next_run_time}")
 
 # 路由
 @app.route('/')
@@ -326,6 +398,16 @@ def get_image():
 @app.route('/refresh', methods=['POST'])
 def refresh_image():
     """手动刷新图片的API端点"""
+    global LAST_REFRESH_TIME
+    
+    current_time = datetime.now()
+    if LAST_REFRESH_TIME and (current_time - LAST_REFRESH_TIME).total_seconds() < REFRESH_COOLDOWN:
+        return jsonify({
+            "status": "error",
+            "message": "刷新太频繁，请稍后再试"
+        }), 429
+        
+    LAST_REFRESH_TIME = current_time
     scheduled_refresh()
     return jsonify({"status": "success"})
 
@@ -454,6 +536,50 @@ def get_today_image(format=None):
         print(error_msg)
         return jsonify({"error": error_msg}), 500
 
+@app.route('/scan', methods=['POST'])
+def scan_directory():
+    """扫描目录的API端点"""
+    global CACHED_IMAGES, LAST_SCAN_TIME
+    
+    try:
+        start_time = datetime.now()
+        print("\n开始手动扫描目录...")
+        
+        # 执行扫描
+        CACHED_IMAGES = get_all_images(IMAGE_FOLDER)
+        LAST_SCAN_TIME = datetime.now()
+        
+        duration = (LAST_SCAN_TIME - start_time).total_seconds()
+        
+        return jsonify({
+            "status": "success",
+            "total_files": len(CACHED_IMAGES),
+            "valid_images": len(CACHED_IMAGES),
+            "duration": round(duration, 2)
+        })
+        
+    except Exception as e:
+        print(f"扫描目录时发生错误: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+@app.route('/scan-status', methods=['GET'])
+def get_scan_status():
+    """获取扫描状态"""
+    global SCAN_STATUS
+    status = SCAN_STATUS.copy()
+    if status["start_time"]:
+        duration = (datetime.now() - status["start_time"]).total_seconds()
+        status["duration"] = round(duration, 2)
+    else:
+        status["duration"] = 0
+        
+    # 添加任务类型标识
+    status["is_manual_scan"] = request.args.get('manual', 'false') == 'true'
+    return jsonify(status)
+
 class ImageFolderHandler(FileSystemEventHandler):
     def __init__(self, refresh_callback):
         self.refresh_callback = refresh_callback
@@ -492,11 +618,14 @@ if __name__ == '__main__':
     # 设置文件监控
     event_handler = ImageFolderHandler(scheduled_refresh)
     observer = Observer()
-    observer.schedule(event_handler, IMAGE_FOLDER, recursive=False)
+    observer.schedule(event_handler, IMAGE_FOLDER, recursive=True)
     observer.start()
-    print(f"已启动文件监控: {IMAGE_FOLDER}")
+    print(f"已启动文件监控（包含子文件夹）: {IMAGE_FOLDER}")
     
-    scheduled_refresh()  # 启动时立即加载
+    # 启动时扫描目录
+    print("执行初始目录扫描...")
+    CACHED_IMAGES = get_all_images(IMAGE_FOLDER)
+    LAST_SCAN_TIME = datetime.now()
     
     # 设置环境变量禁用警告
     os.environ['WERKZEUG_RUN_MAIN'] = 'true'

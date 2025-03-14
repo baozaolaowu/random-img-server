@@ -134,6 +134,10 @@
             background: #2196F3;
             color: white;
         }
+        .modal-buttons .scan-btn {
+            background: #4CAF50;  /* 绿色 */
+            color: white;
+        }
         .modal-buttons button:last-child {
             background: #e0e0e0;
             color: #333;
@@ -144,23 +148,24 @@
         }
         button#settingsBtn, button#refreshBtn {
             position: fixed;
-            padding: 10px 20px;
+            padding: 1rem 1.5rem;
             background: #2196F3;
             color: white;
             border: none;
             cursor: pointer;
-            border-radius: 4px;
+            border-radius: 0.5rem;
             z-index: 100;
-            top: 20px;
+            bottom: 3vh;
+            font-size: 1rem;
+            box-shadow: 0 0.125rem 0.625rem rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            min-width: 5rem;
         }
         button#settingsBtn {
-            right: 20px;
+            right: 2vw;
         }
         button#refreshBtn {
-            right: 120px;
-        }
-        button:hover {
-            background: #1976D2;
+            right: 8rem;
         }
         #imageContainer {
             position: fixed;
@@ -227,6 +232,46 @@
             max-height: 100vh !important;
             object-fit: cover !important;
         }
+
+        /* 添加移动设备适配 */
+        @media (max-width: 768px) {
+            button#settingsBtn, button#refreshBtn {
+                padding: 1.2rem 1.8rem;
+                font-size: 1.2rem;
+                bottom: 4vh;
+                min-width: 6rem;
+            }
+            
+            button#refreshBtn {
+                right: 9rem;
+            }
+        }
+
+        /* 超小屏幕设备适配 */
+        @media (max-width: 480px) {
+            button#settingsBtn, button#refreshBtn {
+                padding: 1.4rem 2rem;
+                font-size: 1.3rem;
+                min-width: 7rem;
+                bottom: 5vh;
+            }
+            
+            button#refreshBtn {
+                right: 10rem;
+            }
+        }
+
+        .scan-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        
+        #scanStatus {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
@@ -282,10 +327,19 @@
                     </label>
                 </div>
             </div>
+
+            <div class="modal-section" id="scanStatus" style="display: none;">
+                <h3>扫描状态</h3>
+                <p>状态: <span id="scanStatusText">准备就绪</span></p>
+                <p>进度: <span id="scanProgress">0/0</span> 个文件</p>
+                <p>有效图片: <span id="validImages">0</span> 个</p>
+                <p>已用时间: <span id="scanDuration">0</span> 秒</p>
+            </div>
         </div>
         
         <div class="modal-buttons">
             <button onclick="saveSettings()">保存设置</button>
+            <button onclick="scanDirectory()" class="scan-btn">扫描目录</button>
             <button onclick="closeSettings()">关闭</button>
         </div>
     </div>
@@ -522,12 +576,83 @@
             });
         });
 
-        // 初始化
+        // 添加扫描状态检查
+        let scanStatusInterval = null;
+
+        function updateScanStatus() {
+            fetch('/scan-status?manual=true')  // 添加manual参数
+                .then(response => response.json())
+                .then(data => {
+                    const statusDiv = document.getElementById('scanStatus');
+                    const statusText = document.getElementById('scanStatusText');
+                    const progress = document.getElementById('scanProgress');
+                    const validImages = document.getElementById('validImages');
+                    const duration = document.getElementById('scanDuration');
+                    const scanBtn = document.querySelector('.scan-btn');
+                    
+                    // 只在手动扫描时显示状态
+                    if (data.is_scanning && data.is_manual_scan) {
+                        statusDiv.style.display = 'block';
+                        statusText.textContent = `扫描中: ${data.current_file}`;
+                        progress.textContent = `${data.processed_files}/${data.total_files}`;
+                        validImages.textContent = data.valid_images;
+                        duration.textContent = data.duration;
+                        scanBtn.disabled = true;
+                        scanBtn.textContent = '扫描中...';
+                    } else {
+                        statusDiv.style.display = 'none';
+                        scanBtn.disabled = false;
+                        scanBtn.textContent = '扫描目录';
+                        if (scanStatusInterval) {
+                            clearInterval(scanStatusInterval);
+                            scanStatusInterval = null;
+                        }
+                    }
+                });
+        }
+
+        // 修改扫描目录函数
+        async function scanDirectory() {
+            if (isLoading) return;
+            
+            try {
+                showLoading();
+                document.getElementById('scanStatus').style.display = 'block';
+                scanStatusInterval = setInterval(updateScanStatus, 1000);
+                
+                const response = await fetch('/scan', { method: 'POST' });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert(`扫描完成\n- 总文件数: ${data.total_files}\n- 有效图片: ${data.valid_images}\n- 用时: ${data.duration}秒`);
+                    // 立即更新一次状态
+                    await updateScanStatus();
+                } else {
+                    alert('扫描失败: ' + data.error);
+                }
+            } catch (error) {
+                console.error('扫描失败:', error);
+                alert('扫描失败，请查看控制台');
+            } finally {
+                hideLoading();
+                if (scanStatusInterval) {
+                    clearInterval(scanStatusInterval);
+                    scanStatusInterval = null;
+                }
+                // 确保按钮和状态显示正确
+                const scanBtn = document.querySelector('.scan-btn');
+                scanBtn.disabled = false;
+                scanBtn.textContent = '扫描目录';
+                document.getElementById('scanStatus').style.display = 'none';
+            }
+        }
+
+        // 在页面加载时检查扫描状态
         window.onload = () => {
             mainImage.style.display = 'block';
             updateScheduleInfo();
             initDisplayMode();
-            // 启动时加载一次图片
+            updateScanStatus();  // 检查是否正在扫描
             updateImage(`/image?t=${Date.now()}`);
         };
 
