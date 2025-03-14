@@ -93,6 +93,55 @@ docker run -d \
 - `0 */2 * * *` → 每2小时
 - `0 9 * * 1-5` → 工作日上午9点
 
+## 使用方法
+
+### 1. 网页访问
+访问 `http://localhost:5000` 可以使用完整的网页界面，包含设置和手动刷新功能。
+
+### 2. 直接图片链接
+
+#### 基础用法（推荐）
+```
+http://localhost:5000/img/today.jpg
+```
+这个地址每次访问都会返回一张新的随机图片，适合在大多数场景下使用。
+
+#### 在不同场景中使用
+
+1. 在壁纸软件中：
+```
+# 直接填写这个地址即可
+http://localhost:5000/img/today.jpg
+```
+
+2. 在 NAS 面板中：
+```
+http://localhost:5000/img/today.jpg
+```
+
+3. 在网页中使用：
+```html
+<!-- 基础用法 -->
+<img src="http://localhost:5000/img/today.jpg">
+
+<!-- 如果遇到缓存问题，可以使用JavaScript动态更新 -->
+<script>
+    const img = document.querySelector('img');
+    function updateImage() {
+        img.src = `http://localhost:5000/img/today.jpg?t=${Date.now()}`;
+    }
+    // 每分钟更新一次
+    setInterval(updateImage, 60000);
+</script>
+```
+
+#### 高级用法
+如果遇到浏览器缓存问题，可以在链接后添加时间戳参数：
+```
+http://localhost:5000/img/today.jpg?t=123
+```
+注意：大多数情况下不需要添加时间戳，基础链接就能满足需求。
+
 ## 赞赏支持 Donate
 
 如果您觉得这个项目对您有帮助，欢迎赞赏支持 👏
@@ -193,3 +242,51 @@ docker run -d \
 - `0 */2 * * *` → Every 2 hours
 - `0 9 * * 1-5` → Weekdays at 9:00 AM
 
+## Usage
+
+### 1. Web Interface
+Visit `http://localhost:5000` to access the full web interface with settings and manual refresh options.
+
+### 2. Direct Image URL
+
+#### Basic Usage (Recommended)
+```
+http://localhost:5000/img/today.jpg
+```
+This URL returns a new random image on each request, suitable for most use cases.
+
+#### Use Cases
+
+1. In Wallpaper Software:
+```
+# Simply use this URL
+http://localhost:5000/img/today.jpg
+```
+
+2. In NAS Panel:
+```
+http://localhost:5000/img/today.jpg
+```
+
+3. In Web Pages:
+```html
+<!-- Basic usage -->
+<img src="http://localhost:5000/img/today.jpg">
+
+<!-- If caching issues occur, use JavaScript to update -->
+<script>
+    const img = document.querySelector('img');
+    function updateImage() {
+        img.src = `http://localhost:5000/img/today.jpg?t=${Date.now()}`;
+    }
+    // Update every minute
+    setInterval(updateImage, 60000);
+</script>
+```
+
+#### Advanced Usage
+If you encounter browser caching issues, you can add a timestamp parameter:
+```
+http://localhost:5000/img/today.jpg?t=123
+```
+Note: In most cases, the basic URL is sufficient and no timestamp is needed.

@@ -488,13 +488,12 @@ def save_schedule():
 @app.route('/img/today')
 @app.route('/img/today.<format>')
 def get_today_image(format=None):
-    """提供一个固定的图片访问地址，支持任意图片格式"""
+    """提供一个固定的图片访问地址，每次访问都会刷新图片"""
     try:
-        # 如果没有当前图片，尝试刷新
-        if not CURRENT_IMAGE.get('path'):
-            scheduled_refresh()
-            
-        # 再次检查是否有可用图片
+        # 每次访问都刷新图片
+        scheduled_refresh()
+        
+        # 如果没有可用图片，返回404
         if not CURRENT_IMAGE.get('path'):
             return jsonify({"error": "没有可用的图片"}), 404
             
@@ -506,28 +505,28 @@ def get_today_image(format=None):
         file_info = get_file_info(CURRENT_IMAGE['path'])
         
         # 获取更新时间作为版本号
-        version = str(int(CURRENT_IMAGE.get('update_time', datetime.now()).timestamp()))
+        version = str(int(datetime.now().timestamp() * 1000))  # 使用毫秒级时间戳
         
         # 获取实际的文件MIME类型
         actual_mime_type = mimetypes.guess_type(CURRENT_IMAGE['path'])[0]
         
-        # 设置响应头，强制浏览器定期刷新
+        # 设置响应头，强制浏览器不缓存
         response = send_file(
             CURRENT_IMAGE['path'],
             mimetype=actual_mime_type,
             conditional=True
         )
         
-        # 添加缓存控制头
-        response.headers['Cache-Control'] = 'no-cache, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        response.headers['X-Version'] = version  # 添加版本号
-        response.headers['X-Original-Format'] = os.path.splitext(CURRENT_IMAGE['path'])[1][1:]  # 添加原始格式信息
-        
-        # 添加Last-Modified和ETag
-        response.headers['Last-Modified'] = http_date(file_info['mtime'])
-        response.headers['ETag'] = f'"{version}"'  # 使用版本号作为ETag
+        # 更强力的缓存控制头
+        response.headers.update({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '-1',
+            'Etag': f'W/"{version}"',  # 使用弱 ETag
+            'Last-Modified': http_date(datetime.now().timestamp()),  # 使用当前时间
+            'X-Version': version,
+            'X-Original-Format': os.path.splitext(CURRENT_IMAGE['path'])[1][1:]
+        })
         
         return response
         
