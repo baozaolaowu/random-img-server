@@ -10,6 +10,11 @@ from werkzeug.http import http_date
 import mimetypes
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from PIL import Image
+from io import BytesIO
+import math
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 # 在文件顶部添加缓存变量
 CACHED_IMAGES = []
@@ -27,6 +32,19 @@ SCAN_STATUS = {
     "skipped_files": 0,
     "current_file": "",
     "start_time": None
+}
+
+# 在app.py中添加图片缓存和索引
+IMAGE_CACHE = {}  # 缓存图片元数据，避免重复读取
+SORT_CACHE = {}  # 缓存排序结果
+
+# 在文件顶部添加新的全局变量，用于跟踪缩略图生成状态
+THUMBNAIL_STATUS = {
+    "is_generating": False,
+    "total": 0,
+    "processed": 0,
+    "start_time": None,
+    "current_file": ""
 }
 
 def parse_cron(exp: str) -> dict:
@@ -145,7 +163,10 @@ app = Flask(__name__, static_url_path='', static_folder='.')
 # 使用当前目录作为基础目录
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FOLDER = os.getenv('CONFIG_FOLDER', os.path.join(BASE_DIR, 'config'))
-IMAGE_FOLDER = os.getenv('IMAGE_FOLDER', os.path.join(BASE_DIR, 'images'))
+# 将图片目录改为photos子目录
+PHOTOS_FOLDER = os.getenv('PHOTOS_FOLDER', os.path.join(BASE_DIR, 'photos'))
+# 缩略图单独放在thumbnails子目录
+THUMBNAIL_FOLDER = os.getenv('THUMBNAIL_FOLDER', os.path.join(BASE_DIR, 'thumbnails'))
 CONFIG_FILE = os.path.join(CONFIG_FOLDER, 'config.json')
 
 # 初始化随机种子
@@ -154,12 +175,14 @@ random.seed(int(datetime.now().timestamp()))
 print(f"应用程序配置信息:")
 print(f"BASE_DIR: {BASE_DIR}")
 print(f"CONFIG_FOLDER: {CONFIG_FOLDER}")
-print(f"IMAGE_FOLDER: {IMAGE_FOLDER}")
+print(f"PHOTOS_FOLDER: {PHOTOS_FOLDER}")
+print(f"THUMBNAIL_FOLDER: {THUMBNAIL_FOLDER}")
 print(f"CONFIG_FILE: {CONFIG_FILE}")
 
 # 确保必要的目录存在
 os.makedirs(CONFIG_FOLDER, exist_ok=True)
-os.makedirs(IMAGE_FOLDER, exist_ok=True)
+os.makedirs(PHOTOS_FOLDER, exist_ok=True)
+os.makedirs(THUMBNAIL_FOLDER, exist_ok=True)
 
 CURRENT_IMAGE = {"path": None}
 lock = Lock()
@@ -195,6 +218,80 @@ def get_file_info(filepath):
         'etag': f'"{get_file_hash(filepath)}"'
     }
 
+def generate_thumbnails_for_images(image_paths, max_concurrent=5):
+    """为图片列表生成缩略图，限制并发数量"""
+    global THUMBNAIL_STATUS
+    
+    print(f"开始生成缩略图，共 {len(image_paths)} 张图片")
+    processed = 0
+    lock = threading.Lock()
+    
+    # 更新状态
+    THUMBNAIL_STATUS["is_generating"] = True
+    THUMBNAIL_STATUS["total"] = len(image_paths)
+    THUMBNAIL_STATUS["processed"] = 0
+    THUMBNAIL_STATUS["start_time"] = datetime.now()
+    
+    def process_image(img_path):
+        nonlocal processed
+        try:
+            # 更新当前处理的文件
+            with lock:
+                THUMBNAIL_STATUS["current_file"] = os.path.basename(img_path)
+            
+            # 获取相对路径
+            rel_path = os.path.relpath(img_path, PHOTOS_FOLDER).replace('\\', '/')
+            
+            # 计算缩略图路径
+            rel_dir = os.path.dirname(rel_path)
+            thumb_dir = os.path.join(THUMBNAIL_FOLDER, rel_dir)
+            os.makedirs(thumb_dir, exist_ok=True)
+            
+            # 使用多种尺寸
+            for width in [200, 400, 800]:
+                filename = os.path.basename(img_path)
+                name, ext = os.path.splitext(filename)
+                thumb_name = f"{name}_w{width}{ext}"
+                thumb_path = os.path.join(thumb_dir, thumb_name)
+                
+                # 如果缩略图不存在，则创建
+                if not os.path.exists(thumb_path):
+                    with Image.open(img_path) as img:
+                        # 保持原始比例
+                        wpercent = (width / float(img.size[0]))
+                        height = int((float(img.size[1]) * float(wpercent)))
+                        
+                        # 处理透明图片
+                        if img.mode == 'RGBA':
+                            background = Image.new('RGB', img.size, (255, 255, 255))
+                            background.paste(img, mask=img.split()[3])
+                            img = background
+                        
+                        # 调整大小
+                        img_resized = img.resize((width, height), Image.LANCZOS)
+                        
+                        # 保存缩略图
+                        img_resized.save(thumb_path, "JPEG", quality=85, optimize=True)
+            
+            with lock:
+                processed += 1
+                THUMBNAIL_STATUS["processed"] = processed
+                if processed % 10 == 0 or processed == len(image_paths):
+                    print(f"缩略图生成进度: {processed}/{len(image_paths)}")
+                    
+        except Exception as e:
+            print(f"生成缩略图失败 {img_path}: {str(e)}")
+    
+    # 使用线程池限制并发
+    with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
+        executor.map(process_image, image_paths)
+    
+    # 更新状态为完成
+    THUMBNAIL_STATUS["is_generating"] = False
+    THUMBNAIL_STATUS["current_file"] = ""
+    
+    print(f"缩略图生成完成，处理了 {processed} 张图片")
+
 def get_all_images(directory):
     """递归获取目录下所有图片文件"""
     global SCAN_STATUS
@@ -209,12 +306,21 @@ def get_all_images(directory):
     images = []
     print(f"\n[{start_time}] 开始扫描图片目录: {directory}")
     
-    # 先统计总文件数
+    # 先统计总文件数，排除缩略图目录
     for root, _, files in os.walk(directory):
+        # 跳过缩略图目录
+        if THUMBNAIL_FOLDER in root:
+            print(f"跳过缩略图目录: {root}")
+            continue
+            
         SCAN_STATUS["total_files"] += len(files)
     
-    # 然后处理文件
+    # 然后处理文件，同样排除缩略图目录
     for root, _, files in os.walk(directory):
+        # 跳过缩略图目录
+        if THUMBNAIL_FOLDER in root:
+            continue
+            
         for f in files:
             SCAN_STATUS["processed_files"] += 1
             SCAN_STATUS["current_file"] = f
@@ -243,6 +349,18 @@ def get_all_images(directory):
     print(f"- 扫描用时: {duration:.2f}秒")
     
     SCAN_STATUS["is_scanning"] = False
+    
+    # 在后台启动缩略图生成任务
+    if images:
+        print("启动后台缩略图生成任务...")
+        import threading
+        thumbnail_thread = threading.Thread(
+            target=generate_thumbnails_for_images,
+            args=(images,),
+            daemon=True
+        )
+        thumbnail_thread.start()
+    
     return images
 
 def scheduled_refresh():
@@ -258,8 +376,31 @@ def scheduled_refresh():
             if not CACHED_IMAGES:
                 print("没有缓存的图片列表，请先扫描目录")
                 return
+            
+            # 读取文件夹设置
+            folder_path = ""
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                folder_path = config.get('folderPath', '')
+            except Exception as e:
+                print(f"读取文件夹配置失败: {str(e)}")
+            
+            # 过滤图片列表
+            filtered_images = CACHED_IMAGES
+            if folder_path:
+                folder_full_path = os.path.join(PHOTOS_FOLDER, folder_path)
+                folder_full_path = os.path.normpath(folder_full_path)
+                filtered_images = [img for img in CACHED_IMAGES 
+                                 if os.path.normpath(img).startswith(folder_full_path)]
                 
-            print(f"使用缓存中的图片列表 (共 {len(CACHED_IMAGES)} 个)")
+                if not filtered_images:
+                    print(f"所选文件夹 '{folder_path}' 中没有图片，使用全部图片列表")
+                    filtered_images = CACHED_IMAGES
+                else:
+                    print(f"已过滤图片列表，从 {len(CACHED_IMAGES)} 张缩小到 {len(filtered_images)} 张")
+            else:
+                print(f"使用全部图片列表 (共 {len(filtered_images)} 个)")
             
             # 选择新图片
             old_image = CURRENT_IMAGE.get('path')
@@ -267,8 +408,8 @@ def scheduled_refresh():
             attempts = 0
             
             while attempts < max_attempts:
-                selected_image = random.choice(CACHED_IMAGES)
-                if selected_image != old_image or len(CACHED_IMAGES) == 1:
+                selected_image = random.choice(filtered_images)
+                if selected_image != old_image or len(filtered_images) == 1:
                     break
                 attempts += 1
                 print(f"尝试选择不同的图片 (尝试 {attempts}/{max_attempts})")
@@ -319,7 +460,7 @@ try:
         'interval', 
         minutes=30,
         id='scan_task',
-        args=[IMAGE_FOLDER],
+        args=[PHOTOS_FOLDER],
         next_run_time=None  # 不立即执行，因为启动时已经执行过了
     )
     print("已设置目录扫描任务: 每30分钟")
@@ -349,8 +490,63 @@ def index():
 @app.route('/image')
 def get_image():
     try:
-        # 如果没有当前图片，尝试刷新
+        # 获取文件夹参数（从请求URL参数获取）
+        folder_path = request.args.get('folder', '')
+        
+        # 如果传入了文件夹参数，按指定文件夹返回图片
+        # 这里不再修改config文件，避免配置干扰和竞争
+        if folder_path:
+            with lock:
+                # 从全局图片列表筛选符合条件的图片
+                folder_full_path = os.path.join(PHOTOS_FOLDER, folder_path)
+                folder_full_path = os.path.normpath(folder_full_path)
+                
+                filtered_images = [img for img in CACHED_IMAGES 
+                               if os.path.normpath(img).startswith(folder_full_path)]
+                
+                if not filtered_images:
+                    # 如果没有找到图片，返回错误
+                    return jsonify({"error": f"文件夹 '{folder_path}' 中没有有效图片"}), 404
+                
+                # 从筛选后的列表中随机选择一张
+                selected_image = random.choice(filtered_images)
+                
+                # 验证文件
+                if not os.path.isfile(selected_image):
+                    return jsonify({"error": f"图片文件不存在: {selected_image}"}), 404
+                
+                # 获取文件信息
+                file_info = get_file_info(selected_image)
+                
+                # 检查客户端缓存
+                if_none_match = request.headers.get('If-None-Match')
+                if if_none_match and if_none_match == file_info['etag']:
+                    return '', 304
+                
+                # 设置响应头
+                headers = {
+                    'Cache-Control': 'public, max-age=60',  # 1分钟缓存
+                    'ETag': file_info['etag'],
+                    'Last-Modified': http_date(file_info['mtime']),
+                    'Content-Type': mimetypes.guess_type(selected_image)[0],
+                    'Content-Length': str(file_info['size'])
+                }
+                
+                # 使用send_from_directory进行流式传输
+                directory = os.path.dirname(selected_image)
+                filename = os.path.basename(selected_image)
+                return send_from_directory(
+                    directory, 
+                    filename, 
+                    conditional=True,
+                    download_name=filename,
+                    as_attachment=False,
+                    mimetype=headers['Content-Type']
+                )
+        
+        # 以下是原有逻辑：使用当前全局设置的图片
         if not CURRENT_IMAGE.get('path'):
+            # 如果没有当前图片，尝试刷新
             scheduled_refresh()
             
         # 再次检查是否有可用图片
@@ -398,7 +594,7 @@ def get_image():
 @app.route('/refresh', methods=['POST'])
 def refresh_image():
     """手动刷新图片的API端点"""
-    global LAST_REFRESH_TIME
+    global LAST_REFRESH_TIME, CURRENT_IMAGE
     
     current_time = datetime.now()
     if LAST_REFRESH_TIME and (current_time - LAST_REFRESH_TIME).total_seconds() < REFRESH_COOLDOWN:
@@ -406,9 +602,48 @@ def refresh_image():
             "status": "error",
             "message": "刷新太频繁，请稍后再试"
         }), 429
+    
+    # 获取文件夹参数，支持URL参数
+    folder_path = request.args.get('folder', '')
+    
+    # 如果传入了文件夹参数，从指定文件夹中随机选择一张图片
+    if folder_path:
+        with lock:
+            try:
+                # 从全局图片列表筛选符合条件的图片
+                folder_full_path = os.path.join(PHOTOS_FOLDER, folder_path)
+                folder_full_path = os.path.normpath(folder_full_path)
+                
+                filtered_images = [img for img in CACHED_IMAGES 
+                               if os.path.normpath(img).startswith(folder_full_path)]
+                
+                if not filtered_images:
+                    print(f"文件夹 '{folder_path}' 中没有有效图片")
+                    return jsonify({
+                        "status": "error",
+                        "message": f"文件夹 '{folder_path}' 中没有有效图片"
+                    }), 404
+                
+                # 从筛选后的列表中随机选择一张
+                selected_image = random.choice(filtered_images)
+                
+                # 更新当前图片
+                CURRENT_IMAGE['path'] = selected_image
+                CURRENT_IMAGE['update_time'] = current_time
+                
+                LAST_REFRESH_TIME = current_time
+                print(f"已从文件夹 '{folder_path}' 刷新图片: {selected_image}")
+            except Exception as e:
+                print(f"处理文件夹参数失败: {str(e)}")
+                return jsonify({
+                    "status": "error",
+                    "message": f"处理文件夹参数失败: {str(e)}"
+                }), 500
+    else:
+        # 如果没有文件夹参数，正常刷新
+        LAST_REFRESH_TIME = current_time
+        scheduled_refresh()
         
-    LAST_REFRESH_TIME = current_time
-    scheduled_refresh()
     return jsonify({"status": "success"})
 
 @app.route('/get-schedule', methods=['GET'])
@@ -545,7 +780,7 @@ def scan_directory():
         print("\n开始手动扫描目录...")
         
         # 执行扫描
-        CACHED_IMAGES = get_all_images(IMAGE_FOLDER)
+        CACHED_IMAGES = get_all_images(PHOTOS_FOLDER)
         LAST_SCAN_TIME = datetime.now()
         
         duration = (LAST_SCAN_TIME - start_time).total_seconds()
@@ -611,19 +846,402 @@ class ImageFolderHandler(FileSystemEventHandler):
         self.last_refresh_time = current_time
         self.refresh_callback()
 
+# 新增路由: 瀑布流页面
+@app.route('/waterfall')
+def waterfall():
+    return render_template('waterfall.html')
+
+# 新增路由: 返回图片列表(支持分页)
+@app.route('/list-images')
+def list_images():
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        folder_path = request.args.get('path', '')
+        sort_by = request.args.get('sort_by', 'name')
+        sort_order = request.args.get('sort_order', 'asc')
+        
+        # 如果传入了exif排序，自动使用创建时间替代
+        if sort_by == 'exif':
+            sort_by = 'created'
+        
+        # 验证参数
+        if page < 1: page = 1
+        if limit < 1 or limit > 100: limit = 20
+        
+        # 生成缓存键
+        cache_key = f"{folder_path}:{sort_by}:{sort_order}"
+        
+        # 构建目标文件夹的完整路径
+        target_folder = os.path.join(PHOTOS_FOLDER, folder_path)
+        
+        # 安全检查，确保路径在photos目录内
+        if not os.path.normpath(target_folder).startswith(os.path.normpath(PHOTOS_FOLDER)):
+            return jsonify({"error": "无效的路径"}), 400
+            
+        # 检查是否有缓存的排序结果
+        if cache_key in SORT_CACHE:
+            all_images = SORT_CACHE[cache_key]
+            print(f"使用缓存的排序结果: {len(all_images)}张图片")
+        else:
+            # 递归获取指定文件夹下的所有图片路径
+            all_images = []
+            
+            for root, _, files in os.walk(target_folder):
+                if THUMBNAIL_FOLDER in root:
+                    continue
+                    
+                for f in files:
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                        full_path = os.path.join(root, f)
+                        rel_path = os.path.relpath(full_path, PHOTOS_FOLDER).replace('\\', '/')
+                        
+                        # 检查是否已缓存该图片的元数据
+                        if rel_path in IMAGE_CACHE:
+                            image_info = IMAGE_CACHE[rel_path]
+                        else:
+                            # 获取基本文件信息
+                            stat = os.stat(full_path)
+                            image_info = {
+                                "path": rel_path,
+                                "name": f,
+                                "created_time": stat.st_ctime,
+                                "modified_time": stat.st_mtime,
+                                "width": None,
+                                "height": None
+                            }
+                            
+                            # 获取图片尺寸但不再读取EXIF数据
+                            try:
+                                with Image.open(full_path) as img:
+                                    image_info["width"], image_info["height"] = img.size
+                            except Exception as e:
+                                print(f"获取图片尺寸失败 {rel_path}: {str(e)}")
+                            
+                            # 缓存图片元数据
+                            IMAGE_CACHE[rel_path] = image_info
+                        
+                        all_images.append(image_info)
+            
+            # 对图片列表排序
+            if sort_by == 'name':
+                all_images.sort(key=lambda x: x["name"].lower(), reverse=(sort_order == 'desc'))
+            elif sort_by == 'created':
+                all_images.sort(key=lambda x: x["created_time"], reverse=(sort_order == 'desc'))
+            elif sort_by == 'modified':
+                all_images.sort(key=lambda x: x["modified_time"], reverse=(sort_order == 'desc'))
+            elif sort_by == 'random':
+                # 随机排序时使用固定的随机种子，确保分页之间顺序一致
+                seed = hash(folder_path) % 10000
+                random.seed(seed)
+                random.shuffle(all_images)
+            
+            # 缓存排序结果
+            SORT_CACHE[cache_key] = all_images
+            print(f"已缓存排序结果: {len(all_images)}张图片, 排序方式: {sort_by} {sort_order}")
+        
+        # 计算分页
+        total = len(all_images)
+        total_pages = math.ceil(total / limit)
+        
+        start_idx = (page - 1) * limit
+        end_idx = min(start_idx + limit, total)
+        
+        # 获取当前页的图片
+        current_page_images = all_images[start_idx:end_idx]
+        
+        return jsonify({
+            "images": current_page_images,
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "hasMore": page < total_pages,
+            "sortBy": sort_by,
+            "sortOrder": sort_order
+        })
+    except Exception as e:
+        print(f"获取图片列表失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# 新增路由: 直接访问图片文件
+@app.route('/img-static/<path:img_path>')
+def get_static_image(img_path):
+    try:
+        # 防止路径遍历攻击
+        normalized_path = os.path.normpath(img_path)
+        if normalized_path.startswith('..'):
+            return jsonify({"error": "无效的路径"}), 400
+            
+        image_path = os.path.join(PHOTOS_FOLDER, normalized_path)
+        
+        if not os.path.exists(image_path) or not os.path.isfile(image_path):
+            return jsonify({"error": "图片不存在"}), 404
+            
+        return send_file(image_path)
+    except Exception as e:
+        print(f"获取图片出错: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# 生成缩略图并返回
+@app.route('/img-thumbnail/<path:img_path>')
+def get_thumbnail(img_path):
+    try:
+        # 防止路径遍历攻击
+        normalized_path = os.path.normpath(img_path)
+        if normalized_path.startswith('..'):
+            return jsonify({"error": "无效的路径"}), 400
+            
+        original_path = os.path.join(PHOTOS_FOLDER, normalized_path)
+        
+        if not os.path.exists(original_path) or not os.path.isfile(original_path):
+            return jsonify({"error": "图片不存在"}), 404
+            
+        # 计算缩略图路径 (保持目录结构)
+        rel_dir = os.path.dirname(normalized_path)
+        thumb_dir = os.path.join(THUMBNAIL_FOLDER, rel_dir)
+        os.makedirs(thumb_dir, exist_ok=True)
+        
+        # 生成缩略图文件名 (使用原文件名+尺寸)
+        width = int(request.args.get('w', 400))  # 默认宽度
+        filename = os.path.basename(normalized_path)
+        name, ext = os.path.splitext(filename)
+        thumb_name = f"{name}_w{width}{ext}"
+        thumb_path = os.path.join(thumb_dir, thumb_name)
+        
+        # 检查缩略图是否已存在
+        if not os.path.exists(thumb_path):
+            # 生成缩略图
+            try:
+                with Image.open(original_path) as img:
+                    # 计算新高度，保持原始比例
+                    wpercent = (width / float(img.size[0]))
+                    height = int((float(img.size[1]) * float(wpercent)))
+                    
+                    # 如果图片是RGBA模式（带透明度），转换为RGB
+                    if img.mode == 'RGBA':
+                        # 创建白色背景
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        # 合并图片
+                        background.paste(img, mask=img.split()[3])
+                        img = background
+                    
+                    # 调整大小，使用高质量重采样
+                    img_resized = img.resize((width, height), Image.LANCZOS)
+                    
+                    # 保存为JPEG格式，质量80%
+                    img_resized.save(thumb_path, "JPEG", quality=80, optimize=True)
+                    
+            except Exception as e:
+                print(f"缩略图生成失败: {str(e)}")
+                # 如果缩略图生成失败，返回原图
+                return send_file(original_path)
+                
+        # 返回缩略图
+        return send_file(thumb_path)
+            
+    except Exception as e:
+        print(f"获取缩略图出错: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# 获取瀑布流布局设置
+@app.route('/get-waterfall-settings', methods=['GET'])
+def get_waterfall_settings():
+    try:
+        # 读取配置文件
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # 如果没有瀑布流设置，使用默认值
+        waterfall_settings = config.get('waterfallSettings', {
+            'columnCount': 3,
+            'columnGap': 15,
+            'imageGap': 15,
+            'borderRadius': 8
+        })
+        
+        return jsonify(waterfall_settings)
+    except Exception as e:
+        print(f"获取瀑布流设置失败: {str(e)}")
+        return jsonify({
+            'columnCount': 3,
+            'columnGap': 15,
+            'imageGap': 15,
+            'borderRadius': 8
+        })
+
+# 保存瀑布流布局设置
+@app.route('/save-waterfall-settings', methods=['POST'])
+def save_waterfall_settings():
+    try:
+        settings = request.json
+        
+        # 验证设置
+        required_fields = ['columnCount', 'columnGap', 'imageGap', 'borderRadius']
+        for field in required_fields:
+            if field not in settings:
+                return jsonify({"error": f"缺少必要字段: {field}"}), 400
+        
+        # 读取现有配置
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # 更新瀑布流设置
+        config['waterfallSettings'] = settings
+        
+        # 保存到配置文件
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({"status": "success"})
+    except Exception as e:
+        error_msg = str(e)
+        print(f"保存瀑布流设置失败: {error_msg}")
+        return jsonify({"error": error_msg}), 500
+
+# 获取文件夹结构
+@app.route('/get-folders')
+def get_folders():
+    try:
+        # 获取当前路径参数（相对路径）
+        current_path = request.args.get('path', '')
+        
+        # 构建绝对路径
+        target_path = os.path.join(PHOTOS_FOLDER, current_path)
+        
+        # 安全检查 - 确保路径在photos目录内
+        if not os.path.normpath(target_path).startswith(os.path.normpath(PHOTOS_FOLDER)):
+            return jsonify({"error": "无效的路径"}), 400
+            
+        # 如果路径不存在
+        if not os.path.exists(target_path) or not os.path.isdir(target_path):
+            return jsonify({"error": "目录不存在"}), 404
+            
+        # 获取当前目录下的所有子目录
+        folders = []
+        # 获取当前目录下的所有图片文件
+        images = []
+        
+        for item in os.listdir(target_path):
+            item_path = os.path.join(target_path, item)
+            rel_path = os.path.join(current_path, item).replace('\\', '/')
+            
+            # 如果是目录，添加到文件夹列表
+            if os.path.isdir(item_path):
+                # 统计文件夹内的图片数量
+                image_count = 0
+                for root, _, files in os.walk(item_path):
+                    for file in files:
+                        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                            image_count += 1
+                
+                folders.append({
+                    "name": item,
+                    "path": rel_path,
+                    "imageCount": image_count
+                })
+            # 如果是图片文件，添加到图片列表
+            elif item.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                images.append(rel_path)
+        
+        # 构建导航路径
+        breadcrumbs = []
+        if current_path:
+            parts = current_path.split('/')
+            current = ""
+            for i, part in enumerate(parts):
+                if part:  # 跳过空字符串
+                    current = os.path.join(current, part)
+                    breadcrumbs.append({
+                        "name": part,
+                        "path": current.replace('\\', '/')
+                    })
+        
+        return jsonify({
+            "currentPath": current_path,
+            "breadcrumbs": breadcrumbs,
+            "folders": folders,
+            "images": images
+        })
+        
+    except Exception as e:
+        print(f"获取文件夹结构失败: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# 添加清除缓存的API
+@app.route('/clear-cache', methods=['POST'])
+def clear_cache():
+    global IMAGE_CACHE, SORT_CACHE
+    IMAGE_CACHE = {}
+    SORT_CACHE = {}
+    return jsonify({"status": "success", "message": "缓存已清除"})
+
+# 保存文件夹设置
+@app.route('/save-folder-setting', methods=['POST'])
+def save_folder_setting():
+    try:
+        folder_path = request.json.get('folder', '')
+        
+        # 读取现有配置
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # 更新文件夹设置
+        config['folderPath'] = folder_path
+        
+        # 保存到配置文件
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({"status": "success"})
+    except Exception as e:
+        error_msg = str(e)
+        print(f"保存文件夹设置失败: {error_msg}")
+        return jsonify({"error": error_msg}), 500
+
+# 获取当前文件夹设置
+@app.route('/get-folder-setting', methods=['GET'])
+def get_folder_setting():
+    try:
+        # 读取配置文件
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # 获取文件夹路径设置
+        folder_path = config.get('folderPath', '')
+        
+        return jsonify({"folder": folder_path})
+    except Exception as e:
+        print(f"获取文件夹设置失败: {str(e)}")
+        return jsonify({"folder": ""})
+
+# 添加一个新的API端点，用于获取缩略图生成状态
+@app.route('/thumbnail-status', methods=['GET'])
+def get_thumbnail_status():
+    """获取缩略图生成状态"""
+    global THUMBNAIL_STATUS
+    status = THUMBNAIL_STATUS.copy()
+    if status["start_time"]:
+        duration = (datetime.now() - status["start_time"]).total_seconds()
+        status["duration"] = round(duration, 2)
+    else:
+        status["duration"] = 0
+    return jsonify(status)
+
 if __name__ == '__main__':
     print("启动应用程序...")
     
     # 设置文件监控
     event_handler = ImageFolderHandler(scheduled_refresh)
     observer = Observer()
-    observer.schedule(event_handler, IMAGE_FOLDER, recursive=True)
+    observer.schedule(event_handler, PHOTOS_FOLDER, recursive=True)
     observer.start()
-    print(f"已启动文件监控（包含子文件夹）: {IMAGE_FOLDER}")
+    print(f"已启动文件监控（包含子文件夹）: {PHOTOS_FOLDER}")
     
     # 启动时扫描目录
     print("执行初始目录扫描...")
-    CACHED_IMAGES = get_all_images(IMAGE_FOLDER)
+    CACHED_IMAGES = get_all_images(PHOTOS_FOLDER)
     LAST_SCAN_TIME = datetime.now()
     
     # 设置环境变量禁用警告

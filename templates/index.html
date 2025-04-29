@@ -5,7 +5,7 @@
     <link rel="icon" type="image/png" href="/assets/image/logo.png">
     <style>
         body { 
-            font-family: Arial, sans-serif; 
+            font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Helvetica Neue", Arial, sans-serif;
             margin: 0; 
             padding: 0; 
             height: 100vh; 
@@ -18,32 +18,33 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: white;
-            padding: 30px;
+            padding: 15px;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             z-index: 1000;
-            width: 800px;
-            max-width: 90vw;
+            width: 95%;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow-y: auto;
         }
         .modal-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 30px;
-            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
         }
         .modal-section {
             background: #f8f9fa;
-            padding: 20px;
+            padding: 10px;
             border-radius: 8px;
         }
         .modal-section h3 {
-            margin: 0 0 15px 0;
-            color: #2196F3;
-            font-size: 18px;
+            margin: 0 0 8px 0;
+            font-size: 15px;
         }
         .modal-section p {
-            margin: 8px 0;
-            color: #666;
+            margin: 5px 0;
+            font-size: 13px;
         }
         .modal-section span {
             color: #333;
@@ -102,70 +103,71 @@
             color: #333;
         }
         input#cronExp {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.3s ease;
+            padding: 8px;
+            margin: 8px 0;
+            font-size: 13px;
         }
         input#cronExp:focus {
             border-color: #2196F3;
             outline: none;
         }
         .modal-buttons {
+            margin-top: 15px;
             display: flex;
             justify-content: flex-end;
             gap: 10px;
-            margin-top: 20px;
-            border-top: 1px solid #eee;
-            padding-top: 20px;
         }
         .modal-buttons button {
-            padding: 10px 20px;
+            padding: 8px 16px;
+            font-size: 13px;
             border: none;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        .modal-buttons button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
         }
         .modal-buttons button:first-child {
             background: #2196F3;
             color: white;
         }
         .modal-buttons .scan-btn {
-            background: #4CAF50;  /* 绿色 */
+            background: #4CAF50;
             color: white;
         }
         .modal-buttons button:last-child {
             background: #e0e0e0;
             color: #333;
         }
-        .modal-buttons button:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
-        button#settingsBtn, button#refreshBtn {
+        button#settingsBtn, button#refreshBtn, button#waterfallBtn {
             position: fixed;
-            padding: 1rem 1.5rem;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
             background: #2196F3;
             color: white;
-            border: none;
             cursor: pointer;
-            border-radius: 0.5rem;
-            z-index: 100;
-            bottom: 3vh;
-            font-size: 1rem;
-            box-shadow: 0 0.125rem 0.625rem rgba(0,0,0,0.2);
+            font-size: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             transition: all 0.3s ease;
-            min-width: 5rem;
+            z-index: 2000;
+            bottom: 3vh;
+        }
+        button#settingsBtn:hover, button#refreshBtn:hover, button#waterfallBtn:hover {
+            background: #1976D2;
+            transform: translateY(-2px);
         }
         button#settingsBtn {
             right: 2vw;
         }
         button#refreshBtn {
-            right: 8rem;
+            right: 160px;
+        }
+        button#waterfallBtn {
+            background: #4CAF50;
+            left: 2vw;
         }
         #imageContainer {
             position: fixed;
@@ -235,21 +237,20 @@
 
         /* 添加移动设备适配 */
         @media (max-width: 768px) {
-            button#settingsBtn, button#refreshBtn {
+            button#settingsBtn, button#refreshBtn, button#waterfallBtn {
                 padding: 1.2rem 1.8rem;
                 font-size: 1.2rem;
-                bottom: 4vh;
                 min-width: 6rem;
             }
             
             button#refreshBtn {
-                right: 9rem;
+                right: 180px;
             }
         }
 
         /* 超小屏幕设备适配 */
         @media (max-width: 480px) {
-            button#settingsBtn, button#refreshBtn {
+            button#settingsBtn, button#refreshBtn, button#waterfallBtn {
                 padding: 1.4rem 2rem;
                 font-size: 1.3rem;
                 min-width: 7rem;
@@ -257,7 +258,7 @@
             }
             
             button#refreshBtn {
-                right: 10rem;
+                right: 200px;
             }
         }
 
@@ -267,52 +268,417 @@
         }
         
         #scanStatus {
-            margin-top: 20px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            text-align: center;
+            padding: 4px;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            display: block !important;
+            transition: transform 0.3s ease;
+        }
+        
+        #scanStatus.collapsed {
+            transform: translateY(100%);
+        }
+        
+        .toggle-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 16px;
+            background: none;
+            border: none;
+            padding: 0 5px;
+            transition: color 0.2s ease;
+        }
+        
+        .toggle-btn:hover {
+            color: white;
+        }
+        
+        #expandBtn {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            border-radius: 4px 4px 0 0;
+            padding: 2px 10px;
+            font-size: 10px;
+            cursor: pointer;
+            z-index: 999;
+            transition: opacity 0.3s ease;
+            opacity: 0;
+        }
+        
+        #expandBtn.visible {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            button#waterfallBtn {
+                padding: 1.2rem 1.8rem;
+                font-size: 1.2rem;
+                bottom: 4vh;
+                left: 2vw;
+                min-width: 6rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            button#waterfallBtn {
+                padding: 1.4rem 2rem;
+                font-size: 1.3rem;
+                min-width: 7rem;
+                bottom: 5vh;
+                left: 2vw;
+            }
+        }
+
+        /* 文件夹选择器样式 */
+        .folder-select-btn {
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .folder-selector {
+            margin-top: 10px;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            overflow: visible;
+            max-height: none;
+        }
+
+        .breadcrumbs {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        .breadcrumb-item {
+            color: #2196F3;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+
+        .breadcrumb-item:after {
+            content: "/";
+            margin-left: 5px;
+            color: #888;
+        }
+
+        .breadcrumb-item:last-child {
+            color: #333;
+            font-weight: bold;
+        }
+
+        .breadcrumb-item:last-child:after {
+            content: "";
+        }
+
+        .breadcrumb-item:hover {
+            text-decoration: underline;
+        }
+
+        .folders-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .folder-item {
+            background: #e3f2fd;
+            border-radius: 6px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .folder-item:hover {
+            background: #bbdefb;
+            transform: translateY(-2px);
+        }
+
+        .folder-icon {
+            color: #2196F3;
+            font-size: 16px;
+            margin-right: 8px;
+        }
+
+        .folder-info {
+            flex: 1;
+        }
+
+        .folder-name {
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .folder-count {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .folder-buttons {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 全部图片按钮样式 */
+        .button-group .all-folders {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        /* 确定取消按钮容器 */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        /* 蓝色按钮样式 */
+        .blue-btn {
+            background: #2196F3 !important;
+            color: white !important;
+            padding: 8px 16px !important;
+            border: none !important;
+            border-radius: 6px !important;
+            cursor: pointer !important;
+            font-size: 14px !important;
+        }
+
+        .blue-btn.secondary {
+            background: #64B5F6 !important; /* 浅蓝色 */
+        }
+
+        /* 修改文件夹选择部分的布局，使其横向展开 */
+        .modal-section folder-section {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        .folder-header {
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .folder-header p {
+            margin: 0;
+        }
+
+        .folder-header button {
+            margin-left: 10px;
+        }
+
+        /* 改进文件夹设置区域的布局 */
+        .folder-section {
+            width: 100%;
+            grid-column: span 2;
+        }
+
+        .folder-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .folder-select-btn {
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            min-width: 120px;
+        }
+
+        .folder-selector {
+            margin-top: 15px;
             padding: 15px;
             background: #f5f5f5;
             border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .folders-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 15px 0;
+        }
+
+        .folder-item {
+            background: #e3f2fd;
+            border-radius: 6px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .folder-section {
+                grid-column: span 1;
+            }
+            
+            .folders-container {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+        }
+
+        /* 从上到下排列的布局 */
+        .modal-grid.single-column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* 添加左右布局容器 */
+        .settings-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 0;
+        }
+
+        /* 调整示例容器样式适应右侧空间 */
+        .examples-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .example-item {
+            padding: 6px;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .example-item:hover {
+            background-color: #e3f2fd;
+        }
+
+        .example-item .cron-exp {
+            text-decoration: underline;
+            color: #2196F3;
+        }
+
+        .example-item .cron-desc {
+            color: #555;
+        }
+
+        /* 显示设置网格 */
+        .display-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+
+        .display-settings-grid label {
+            padding: 6px;
+            font-size: 13px;
+        }
+
+        /* 文件夹选择器 */
+        .folder-header {
+            margin-bottom: 6px;
+        }
+
+        .folder-selector {
+            margin-top: 8px;
+            padding: 8px;
         }
     </style>
 </head>
 <body>
     <div id="settingsModal">
         <div class="modal-grid">
-            <div class="modal-section">
-                <h3>定时设置</h3>
-                <p>当前设置: <span id="currentCron">loading...</span></p>
-                <p>描述: <span id="cronDesc" style="color: #2196F3;">loading...</span></p>
-                <p>下次执行: <span id="nextRun">loading...</span></p>
-                <p>上次更新: <span id="lastUpdate">loading...</span></p>
-                <p>当前图片: <span id="currentImage">loading...</span></p>
-                <input type="text" id="cronExp" placeholder="输入cron表达式 如: */5 * * * * (每5分钟)">
-                <div class="cron-examples">
-                    <p>常用示例（点击使用）:</p>
-                    <div class="example-item" onclick="applyCron('*/5 * * * *')">
-                        <span class="cron-exp">*/5 * * * *</span>
-                        <span class="cron-desc">每5分钟</span>
-                    </div>
-                    <div class="example-item" onclick="applyCron('*/10 * * * *')">
-                        <span class="cron-exp">*/10 * * * *</span>
-                        <span class="cron-desc">每10分钟</span>
-                    </div>
-                    <div class="example-item" onclick="applyCron('*/30 * * * *')">
-                        <span class="cron-exp">*/30 * * * *</span>
-                        <span class="cron-desc">每30分钟</span>
-                    </div>
-                    <div class="example-item" onclick="applyCron('0 * * * *')">
-                        <span class="cron-exp">0 * * * *</span>
-                        <span class="cron-desc">每小时整点</span>
-                    </div>
-                    <div class="example-item" onclick="applyCron('0 */2 * * *')">
-                        <span class="cron-exp">0 */2 * * *</span>
-                        <span class="cron-desc">每2小时</span>
+            <div class="settings-row">
+                <!-- 左侧：定时设置 -->
+                <div class="modal-section">
+                    <h3>定时设置</h3>
+                    <p>当前设置: <span id="currentCron">loading...</span></p>
+                    <p>描述: <span id="cronDesc" style="color: #2196F3;">loading...</span></p>
+                    <p>下次执行: <span id="nextRun">loading...</span></p>
+                    <p>上次更新: <span id="lastUpdate">loading...</span></p>
+                    <p>当前图片: <span id="currentImage">loading...</span></p>
+                    <input type="text" id="cronExp" placeholder="输入cron表达式 如: */5 * * * * (每5分钟)">
+                </div>
+                
+                <!-- 右侧：常用示例 -->
+                <div class="modal-section">
+                    <h3>常用示例（点击使用）</h3>
+                    <div class="examples-grid">
+                        <div class="example-item" onclick="applyCron('*/5 * * * *')">
+                            <span class="cron-exp">*/5 * * * *</span>
+                            <span class="cron-desc">每5分钟</span>
+                        </div>
+                        <div class="example-item" onclick="applyCron('*/10 * * * *')">
+                            <span class="cron-exp">*/10 * * * *</span>
+                            <span class="cron-desc">每10分钟</span>
+                        </div>
+                        <div class="example-item" onclick="applyCron('*/30 * * * *')">
+                            <span class="cron-exp">*/30 * * * *</span>
+                            <span class="cron-desc">每30分钟</span>
+                        </div>
+                        <div class="example-item" onclick="applyCron('0 * * * *')">
+                            <span class="cron-exp">0 * * * *</span>
+                            <span class="cron-desc">每小时整点</span>
+                        </div>
+                        <div class="example-item" onclick="applyCron('0 */2 * * *')">
+                            <span class="cron-exp">0 */2 * * *</span>
+                            <span class="cron-desc">每2小时</span>
+                        </div>
                     </div>
                 </div>
             </div>
             
             <div class="modal-section">
                 <h3>显示设置</h3>
-                <div class="display-settings">
+                <div class="display-settings-grid">
                     <label>
                         <input type="radio" name="displayMode" value="smart" checked> 智能模式
                     </label>
@@ -328,12 +694,28 @@
                 </div>
             </div>
 
-            <div class="modal-section" id="scanStatus" style="display: none;">
-                <h3>扫描状态</h3>
-                <p>状态: <span id="scanStatusText">准备就绪</span></p>
-                <p>进度: <span id="scanProgress">0/0</span> 个文件</p>
-                <p>有效图片: <span id="validImages">0</span> 个</p>
-                <p>已用时间: <span id="scanDuration">0</span> 秒</p>
+            <div class="modal-section">
+                <h3>图源选择</h3>
+                <div class="folder-header">
+                    <p>当前图源: <span id="currentFolder">全部图片</span></p>
+                    <button onclick="showFolderSelector()" class="folder-select-btn">选择图源</button>
+                </div>
+                
+                <div id="folderSelector" class="folder-selector" style="display:none;">
+                    <div class="breadcrumbs" id="folderBreadcrumbs">
+                        <span class="breadcrumb-item active" data-path="">Home</span>
+                    </div>
+                    <div class="folders-container" id="folderListContainer">
+                        <!-- 文件夹将通过JS动态加载 -->
+                    </div>
+                    <div class="button-group folder-buttons">
+                        <button class="all-folders" onclick="selectAllFolders()">显示全部图片</button>
+                        <div class="action-buttons">
+                            <button class="primary blue-btn" onclick="selectCurrentFolder()">确定</button>
+                            <button class="secondary blue-btn" onclick="closeFolderSelector()">取消</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -345,15 +727,30 @@
     </div>
     <button id="settingsBtn" onclick="showSettings()">设置</button>
     <button id="refreshBtn" onclick="refreshImage()">切换图片</button>
+    <button id="waterfallBtn" onclick="location.href='/waterfall'">切换瀑布流</button>
     <div id="imageContainer">
         <img id="mainImage" src="/image" alt="随机图片" style="display: none;">
         <div id="loadingIndicator" style="display: none;">加载中...</div>
     </div>
 
+    <!-- 添加状态栏 -->
+    <div id="scanStatus">
+        <span id="statusText">正在获取状态...</span>
+        <button class="toggle-btn" id="collapseBtn" title="收起状态栏">▼</button>
+    </div>
+    
+    <!-- 添加展开按钮 -->
+    <button id="expandBtn" title="展开状态栏">▲</button>
+
     <script>
         let isLoading = false;
         const mainImage = document.getElementById('mainImage');
         const loadingIndicator = document.getElementById('loadingIndicator');
+        let statusUpdateInterval = null;
+        let scanStatusInterval = null;
+        
+        // 当前选择的文件夹路径
+        let currentFolderPath = '';
 
         function showLoading() {
             isLoading = true;
@@ -400,14 +797,23 @@
             if (isLoading) return;
             
             try {
-                await fetch('/refresh', { method: 'POST' });
-                // 更新主图片
-                await updateImage(`/image?t=${Date.now()}`);
+                // 获取当前选择的文件夹路径
+                const folderParam = currentFolderPath ? `?folder=${encodeURIComponent(currentFolderPath)}` : '';
+                
+                // 调用刷新接口，传入文件夹参数
+                await fetch(`/refresh${folderParam}`, { method: 'POST' });
+                
+                // 更新主图片，同样传入文件夹参数
+                const timestamp = Date.now();
+                const imageUrl = `/image${folderParam ? folderParam + '&' : '?'}t=${timestamp}`;
+                await updateImage(imageUrl);
+                
                 // 同时更新固定地址的图片
                 const fixedImages = document.querySelectorAll('img[src*="/img/today.jpg"]');
                 fixedImages.forEach(img => {
-                    img.src = `/img/today.jpg?t=${Date.now()}`;
+                    img.src = `/img/today.jpg?t=${timestamp}`;
                 });
+                
                 updateScheduleInfo();
             } catch (error) {
                 console.error('刷新失败:', error);
@@ -463,26 +869,22 @@
             const visibilityState = document.visibilityState; // 'visible' 或 'hidden'
             const isHidden = document.hidden;
             
-            console.log('页面状态变化:');
-            console.log('- 可见性状态:', visibilityState);
-            console.log('- 是否隐藏:', isHidden);
-            console.log('- 当前标签页是否活跃:', !isHidden);
-            
             if (isHidden) {
                 // 页面不可见时（切换标签页/最小化/锁屏等）
-                console.log('页面不可见，暂停更新');
                 if (updateTimer) {
                     clearTimeout(updateTimer);
                     updateTimer = null;
                 }
             } else {
                 // 页面重新可见时（切回标签页/恢复窗口等）
-                console.log('页面重新可见，恢复更新');
                 // 立即更新一次信息
                 updateScheduleInfo();
                 // 更新图片（如果设置了自动更新）
                 if (document.getElementById('cronExp').value.includes('*')) {
-                    updateImage(`/image?t=${Date.now()}`);
+                    const folderParam = currentFolderPath ? `?folder=${encodeURIComponent(currentFolderPath)}` : '';
+                    const timestamp = Date.now();
+                    const imageUrl = `/image${folderParam ? folderParam + '&' : '?'}t=${timestamp}`;
+                    updateImage(imageUrl);
                 }
             }
         });
@@ -497,7 +899,6 @@
         // 应用显示模式
         function applyDisplayMode(mode, imageElement = null) {
             const img = imageElement || document.getElementById('mainImage');
-            console.log(`应用显示模式: ${mode}`);
             
             // 移除所有模式类
             img.classList.remove('img-width-fill', 'img-height-fill', 'img-stretch-fill', 'img-smart-fill');
@@ -506,17 +907,13 @@
                 img.classList.add('img-smart-fill');
                 // 检查图片方向并应用相应样式
                 if (img.naturalWidth && img.naturalHeight) {
-                    console.log('图片已加载，直接应用智能模式');
                     applySmartMode(img);
                 } else {
-                    console.log('图片未加载完成，等待加载后应用智能模式');
                     img.onload = () => {
-                        console.log('图片加载完成，开始应用智能模式');
                         applySmartMode(img);
                     };
                 }
             } else {
-                console.log(`应用固定模式: ${mode}`);
                 img.classList.add(`img-${mode}-fill`);
             }
             
@@ -529,12 +926,6 @@
             const imageRatio = img.naturalWidth / img.naturalHeight;
             const screenRatio = window.innerWidth / window.innerHeight;
             
-            console.log('智能模式判断信息:');
-            console.log(`图片尺寸: ${img.naturalWidth} x ${img.naturalHeight}`);
-            console.log(`图片宽高比: ${imageRatio.toFixed(2)}`);
-            console.log(`屏幕尺寸: ${window.innerWidth} x ${window.innerHeight}`);
-            console.log(`屏幕宽高比: ${screenRatio.toFixed(2)}`);
-            
             // 移除之前的样式
             img.style.width = '';
             img.style.height = '';
@@ -542,21 +933,18 @@
             img.style.maxHeight = '';
             
             if (imageRatio > screenRatio) {
-                console.log('判定为横图，使用高度适配');
                 // 横图，使用高度适配，宽度自适应
                 img.style.height = '100vh';
                 img.style.width = 'auto';
                 img.style.maxWidth = '100vw';
                 img.style.objectFit = 'cover';
             } else {
-                console.log('判定为竖图，使用宽度适配');
                 // 竖图，使用宽度适配，高度自适应
                 img.style.width = '100vw';
                 img.style.height = 'auto';
                 img.style.maxHeight = '100vh';
                 img.style.objectFit = 'cover';
             }
-            console.log('应用后的样式:', img.style.cssText);
         }
 
         // 监听窗口大小变化
@@ -576,31 +964,52 @@
             });
         });
 
-        // 添加扫描状态检查
-        let scanStatusInterval = null;
-
+        // 更新扫描状态
         function updateScanStatus() {
-            fetch('/scan-status?manual=true')  // 添加manual参数
-                .then(response => response.json())
+            fetch('/scan-status?manual=true')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('获取状态失败');
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    const statusDiv = document.getElementById('scanStatus');
-                    const statusText = document.getElementById('scanStatusText');
-                    const progress = document.getElementById('scanProgress');
-                    const validImages = document.getElementById('validImages');
-                    const duration = document.getElementById('scanDuration');
+                    const scanStatusElement = document.getElementById('scanStatus');
+                    const statusTextElement = document.getElementById('statusText');
                     const scanBtn = document.querySelector('.scan-btn');
                     
-                    // 只在手动扫描时显示状态
+                    if (!scanStatusElement || !statusTextElement) {
+                        console.error('找不到状态栏元素');
+                        return;
+                    }
+                    
+                    let statusText = '';
+                    
                     if (data.is_scanning && data.is_manual_scan) {
-                        statusDiv.style.display = 'block';
-                        statusText.textContent = `扫描中: ${data.current_file}`;
-                        progress.textContent = `${data.processed_files}/${data.total_files}`;
-                        validImages.textContent = data.valid_images;
-                        duration.textContent = data.duration;
+                        // 扫描中状态
+                        statusText = `扫描中: ${data.current_file || '未知'} | 进度: ${data.processed_files || 0}/${data.total_files || 0} | 有效图片: ${data.valid_images || 0} | 用时: ${data.duration || 0}秒`;
                         scanBtn.disabled = true;
                         scanBtn.textContent = '扫描中...';
                     } else {
-                        statusDiv.style.display = 'none';
+                        // 就绪状态，显示完整信息
+                        statusText = `就绪 | 总文件数: ${data.total_files || 0} | 有效图片: ${data.valid_images || 0}`;
+                        
+                        // 如果有缩略图信息，添加到状态栏
+                        fetch('/thumbnail-status')
+                            .then(response => response.json())
+                            .then(thumbData => {
+                                if (thumbData.is_generating) {
+                                    statusText += ` | 缩略图: ${thumbData.processed || 0}/${thumbData.total || 0}`;
+                                } else if (thumbData.total > 0) {
+                                    statusText += ` | 缩略图: 已完成 (${thumbData.total || 0}张)`;
+                                }
+                                statusTextElement.textContent = statusText;
+                            })
+                            .catch(error => {
+                                console.error('获取缩略图状态失败:', error);
+                                statusTextElement.textContent = statusText;
+                            });
+                        
                         scanBtn.disabled = false;
                         scanBtn.textContent = '扫描目录';
                         if (scanStatusInterval) {
@@ -608,17 +1017,28 @@
                             scanStatusInterval = null;
                         }
                     }
+                    
+                    // 如果是扫描状态，直接更新内容
+                    if (data.is_scanning && data.is_manual_scan) {
+                        statusTextElement.textContent = statusText;
+                    }
+                })
+                .catch(error => {
+                    console.error('获取扫描状态失败:', error);
+                    const statusTextElement = document.getElementById('statusText');
+                    if (statusTextElement) {
+                        statusTextElement.textContent = '获取状态失败';
+                    }
                 });
         }
 
-        // 修改扫描目录函数
+        // 扫描目录
         async function scanDirectory() {
             if (isLoading) return;
             
             try {
                 showLoading();
-                document.getElementById('scanStatus').style.display = 'block';
-                scanStatusInterval = setInterval(updateScanStatus, 1000);
+                scanStatusInterval = setInterval(updateScanStatus, 10000);
                 
                 const response = await fetch('/scan', { method: 'POST' });
                 const data = await response.json();
@@ -639,22 +1059,12 @@
                     clearInterval(scanStatusInterval);
                     scanStatusInterval = null;
                 }
-                // 确保按钮和状态显示正确
+                // 确保按钮状态正确
                 const scanBtn = document.querySelector('.scan-btn');
                 scanBtn.disabled = false;
                 scanBtn.textContent = '扫描目录';
-                document.getElementById('scanStatus').style.display = 'none';
             }
         }
-
-        // 在页面加载时检查扫描状态
-        window.onload = () => {
-            mainImage.style.display = 'block';
-            updateScheduleInfo();
-            initDisplayMode();
-            updateScanStatus();  // 检查是否正在扫描
-            updateImage(`/image?t=${Date.now()}`);
-        };
 
         // 显示设置弹窗
         function showSettings() {
@@ -674,6 +1084,7 @@
                 alert('请输入cron表达式');
                 return;
             }
+            
             fetch('/save-schedule', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -689,6 +1100,229 @@
                         alert('保存失败: ' + data.error);
                     });
                 }
+            });
+        }
+
+        // 显示文件夹选择器
+        function showFolderSelector() {
+            document.getElementById('folderSelector').style.display = 'block';
+            loadFolders('');
+        }
+
+        // 关闭文件夹选择器
+        function closeFolderSelector() {
+            document.getElementById('folderSelector').style.display = 'none';
+        }
+
+        // 选择当前文件夹
+        function selectCurrentFolder() {
+            document.getElementById('currentFolder').textContent = 
+                currentFolderPath ? currentFolderPath : '全部图片';
+            
+            // 保存到配置
+            saveFolderSetting(currentFolderPath);
+            
+            // 关闭选择器
+            closeFolderSelector();
+        }
+
+        // 选择显示全部图片
+        function selectAllFolders() {
+            currentFolderPath = '';
+            document.getElementById('currentFolder').textContent = '全部图片';
+            
+            // 保存到配置
+            saveFolderSetting('');
+            
+            // 关闭选择器
+            closeFolderSelector();
+        }
+
+        // 保存文件夹设置到服务器
+        async function saveFolderSetting(folderPath) {
+            try {
+                const response = await fetch('/save-folder-setting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder: folderPath })
+                });
+                
+                if (response.ok) {
+                    // 刷新图片
+                    refreshImage();
+                } else {
+                    const data = await response.json();
+                    alert('保存文件夹设置失败: ' + (data.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('保存文件夹设置失败:', error);
+                alert('保存文件夹设置失败: ' + error.message);
+            }
+        }
+
+        // 加载文件夹列表
+        async function loadFolders(path) {
+            try {
+                showLoading();
+                const response = await fetch(`/get-folders?path=${encodeURIComponent(path)}`);
+                
+                if (!response.ok) {
+                    throw new Error('加载文件夹失败');
+                }
+                
+                const data = await response.json();
+                currentFolderPath = data.currentPath;
+                
+                // 更新面包屑导航
+                updateFolderBreadcrumbs(data.breadcrumbs);
+                
+                // 显示文件夹
+                const foldersContainer = document.getElementById('folderListContainer');
+                foldersContainer.innerHTML = '';
+                
+                if (data.folders.length === 0) {
+                    foldersContainer.innerHTML = '<div style="padding:10px;color:#666;">此文件夹没有子文件夹</div>';
+                } else {
+                    // 显示所有文件夹
+                    data.folders.forEach(folder => {
+                        const folderItem = document.createElement('div');
+                        folderItem.className = 'folder-item';
+                        folderItem.innerHTML = `
+                            <span class="folder-icon">📁</span>
+                            <div class="folder-info">
+                                <div class="folder-name">${folder.name}</div>
+                                <div class="folder-count">${folder.imageCount} 张图片</div>
+                            </div>
+                        `;
+                        folderItem.onclick = () => navigateToFolder(folder.path);
+                        foldersContainer.appendChild(folderItem);
+                    });
+                }
+                
+            } catch (error) {
+                console.error('加载文件夹失败:', error);
+                alert('加载文件夹结构失败');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 更新文件夹面包屑导航
+        function updateFolderBreadcrumbs(breadcrumbs) {
+            const breadcrumbsContainer = document.getElementById('folderBreadcrumbs');
+            breadcrumbsContainer.innerHTML = '';
+            
+            // 添加根目录
+            const rootItem = document.createElement('span');
+            rootItem.className = 'breadcrumb-item';
+            rootItem.textContent = 'Home';
+            rootItem.dataset.path = '';
+            rootItem.onclick = () => navigateToFolder('');
+            breadcrumbsContainer.appendChild(rootItem);
+            
+            // 添加路径层级
+            breadcrumbs.forEach(crumb => {
+                const item = document.createElement('span');
+                item.className = 'breadcrumb-item';
+                item.textContent = crumb.name;
+                item.dataset.path = crumb.path;
+                item.onclick = () => navigateToFolder(crumb.path);
+                breadcrumbsContainer.appendChild(item);
+            });
+            
+            // 标记最后一个为活动状态
+            const items = breadcrumbsContainer.querySelectorAll('.breadcrumb-item');
+            if (items.length > 0) {
+                items[items.length - 1].classList.add('active');
+            }
+        }
+
+        // 导航到特定文件夹
+        function navigateToFolder(path) {
+            currentFolderPath = path;
+            loadFolders(path);
+        }
+
+        // 初始化时加载当前文件夹设置
+        async function loadCurrentFolderSetting() {
+            try {
+                const response = await fetch('/get-folder-setting');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentFolderPath = data.folder || '';
+                    document.getElementById('currentFolder').textContent = 
+                        currentFolderPath ? currentFolderPath : '全部图片';
+                }
+            } catch (error) {
+                console.error('加载文件夹设置失败:', error);
+            }
+        }
+
+        // 在页面加载时初始化
+        window.onload = () => {
+            mainImage.style.display = 'block';
+            updateScheduleInfo();
+            initDisplayMode();
+            loadCurrentFolderSetting().then(() => {
+                const folderParam = currentFolderPath ? `?folder=${encodeURIComponent(currentFolderPath)}` : '';
+                const timestamp = Date.now();
+                const imageUrl = `/image${folderParam ? folderParam + '&' : '?'}t=${timestamp}`;
+                updateImage(imageUrl);
+            });
+            
+            // 初始化状态栏和收起/展开功能
+            initStatusBar();
+            
+            // 确保状态栏显示
+            const scanStatusElement = document.getElementById('scanStatus');
+            const statusTextElement = document.getElementById('statusText');
+            if (scanStatusElement && statusTextElement) {
+                scanStatusElement.style.display = 'block';
+                statusTextElement.textContent = '正在获取状态...';
+            }
+            
+            // 立即更新一次状态
+            updateScanStatus();
+            
+            // 设置定时更新
+            statusUpdateInterval = setInterval(updateScanStatus, 10000);
+            
+            // 在页面卸载时清除定时器
+            window.addEventListener('unload', () => {
+                if (statusUpdateInterval) {
+                    clearInterval(statusUpdateInterval);
+                }
+                if (scanStatusInterval) {
+                    clearInterval(scanStatusInterval);
+                }
+            });
+        };
+        
+        // 初始化状态栏的收起/展开功能
+        function initStatusBar() {
+            const scanStatus = document.getElementById('scanStatus');
+            const collapseBtn = document.getElementById('collapseBtn');
+            const expandBtn = document.getElementById('expandBtn');
+            
+            // 从本地存储加载状态栏状态
+            const isCollapsed = localStorage.getItem('statusBarCollapsed') === 'true';
+            if (isCollapsed) {
+                scanStatus.classList.add('collapsed');
+                expandBtn.classList.add('visible');
+            }
+            
+            // 收起按钮
+            collapseBtn.addEventListener('click', () => {
+                scanStatus.classList.add('collapsed');
+                expandBtn.classList.add('visible');
+                localStorage.setItem('statusBarCollapsed', 'true');
+            });
+            
+            // 展开按钮
+            expandBtn.addEventListener('click', () => {
+                scanStatus.classList.remove('collapsed');
+                expandBtn.classList.remove('visible');
+                localStorage.setItem('statusBarCollapsed', 'false');
             });
         }
     </script>

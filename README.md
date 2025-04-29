@@ -1,6 +1,6 @@
 <img src="assets/image/logo.png" alt="随机图片&每日一图" width="200">
 
-
+### 2025年4月28日，修改了docker的路径映射，请注意。
 
 # 随机图片&每日一图
 
@@ -38,6 +38,15 @@ https://today-img.20160825.xyz/img/today.jpg
   - 带宽感知更新
   - 非活动标签页资源节省
 
+- 🎞️ 瀑布流模式：
+  - 浏览多张图片的最佳方式
+  - 多列自适应布局，可自定义列数（1-10列）
+  - 文件夹导航与层级浏览
+  - 图片排序功能（按文件名、创建时间、修改时间、随机顺序）
+  - 图片全屏查看与缩放
+  - 键盘导航（方向键切换图片，滚轮缩放，Ctrl+滚轮切换图片）
+  - 自定义布局设置（列间距、图片间距、圆角大小）
+
 ## 应用场景
 
 - 电子相框：自动轮播显示您的照片集
@@ -50,7 +59,7 @@ https://today-img.20160825.xyz/img/today.jpg
 1. 创建配置目录：
 ```bash
 # 创建配置和图片目录
-mkdir -p /path/to/config /path/to/images
+mkdir -p /path/to/config /path/to/photos /path/to/thumbnails
 ```
 
 2. 拉取 Docker 镜像：
@@ -63,7 +72,8 @@ docker pull baozaolaowu/random-img-server:latest
 docker run -d \
   -p 5000:5000 \
   -v "/path/to/config:/app/config" \
-  -v "/path/to/images:/app/images" \
+  -v "/path/to/photos:/app/photos" \
+  -v "/path/to/thumbnails:/app/thumbnails" \
   --name random-img-server \
   baozaolaowu/random-img-server:latest
 ```
@@ -71,6 +81,7 @@ docker run -d \
 4. 访问服务：
 - 网页界面：`http://localhost:5000`
 - 直接图片链接：`http://localhost:5000/img/today.jpg`
+- 瀑布流模式：`http://localhost:5000/waterfall`（或在主页面左下角点击"切换瀑布流模式"按钮）
 
 ## 配置说明
 
@@ -187,6 +198,15 @@ https://today-img.20160825.xyz/img/today.jpg
   - Bandwidth-aware updates
   - Resource-saving when tab is inactive
 
+- 🎞️ 瀑布流模式：
+  - 浏览多张图片的最佳方式
+  - 多列自适应布局，可自定义列数（1-10列）
+  - 文件夹导航与层级浏览
+  - 图片排序功能（按文件名、创建时间、修改时间、随机顺序）
+  - 图片全屏查看与缩放
+  - 键盘导航（方向键切换图片，滚轮缩放，Ctrl+滚轮切换图片）
+  - 自定义布局设置（列间距、图片间距、圆角大小）
+
 ## Use Cases
 
 - Digital Photo Frame: Display your photo collection with automatic rotation
@@ -199,7 +219,7 @@ https://today-img.20160825.xyz/img/today.jpg
 1. Create configuration directory:
 ```bash
 # Create config and images directories
-mkdir -p /path/to/config /path/to/images
+mkdir -p /path/to/config /path/to/photos /path/to/thumbnails
 ```
 
 2. Pull the Docker image:
@@ -212,7 +232,8 @@ docker pull baozaolaowu/random-img-server:latest
 docker run -d \
   -p 5000:5000 \
   -v "/path/to/config:/app/config" \
-  -v "/path/to/images:/app/images" \
+  -v "/path/to/photos:/app/photos" \
+  -v "/path/to/thumbnails:/app/thumbnails" \
   --name random-img-server \
   baozaolaowu/random-img-server:latest
 ```
@@ -220,6 +241,7 @@ docker run -d \
 4. Access the service:
 - Web interface: `http://localhost:5000`
 - Direct image URL: `http://localhost:5000/img/today.jpg`
+- 瀑布流模式：`http://localhost:5000/waterfall`（或在主页面左下角点击"切换瀑布流模式"按钮）
 
 ## Configuration
 
